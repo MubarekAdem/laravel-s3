@@ -53,10 +53,6 @@ class S3Controller extends Controller
     public function put(Request $r, string $bucket, string $key)
     {
         $b = $this->bucket($bucket);
-        if (($r->getContentLength() ?? 0) > config('object-store.max_bytes')) {
-            abort(413, 'Object exceeds configured size.');
-        }
-
         $p = $this->path($b, $key);
         File::ensureDirectoryExists(dirname($p));
         $source = $this->copySource($r);
@@ -66,6 +62,10 @@ class S3Controller extends Controller
             $action = 'object.copy';
         } else {
             $body = $r->getContent();
+            if (strlen($body) > config('object-store.max_bytes')) {
+                abort(413, 'Object exceeds configured size.');
+            }
+
             $attributes = ['path' => $p, 'size' => strlen($body), 'etag' => md5($body), 'content_type' => $r->header('Content-Type'), 'metadata' => collect($r->headers->all())->filter(fn ($v, $k) => str_starts_with($k, 'x-amz-meta-'))->map(fn ($v) => $v[0])->all(), 'is_public' => $r->header('x-amz-acl') === 'public-read', 'deleted_at' => null];
             $action = 'object.put';
         }
