@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\StorageMutex;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
 
@@ -20,6 +21,7 @@ class CheckObjectStore extends Command
             'Trash retention is nonnegative' => config('object-store.trash_days') >= 0,
             'Multipart retention is positive' => config('object-store.multipart_hours') > 0,
             'Storage directory exists and is writable' => is_dir($root) && is_writable($root),
+            'No interrupted writes or restore pending' => ! app(StorageMutex::class)->hasPendingWrites(),
             'Storage is outside the public directory' => ! str_starts_with(str_replace('\\', '/', rtrim($root, '/\\')).'/', str_replace('\\', '/', public_path()).'/'),
         ];
         foreach (['buckets', 'objects', 'access_keys', 'audit_events', 'multipart_uploads', 'multipart_parts'] as $table) {

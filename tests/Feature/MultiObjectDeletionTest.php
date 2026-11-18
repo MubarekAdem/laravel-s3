@@ -106,19 +106,22 @@ class MultiObjectDeletionTest extends TestCase
 
     private function signedHeaders(AccessKey $key, string $secret, string $body): array
     {
-        $date = '20261118T120000Z';
-        $scope = '20261118/us-east-1/s3/aws4_request';
+        $date = now()->utc()->format('Ymd\\THis\\Z');
+        $dateStamp = substr($date, 0, 8);
+        $scope = $dateStamp.'/us-east-1/s3/aws4_request';
         $payloadHash = hash('sha256', $body);
-        $signedHeaders = 'x-amz-content-sha256;x-amz-date';
-        $canonical = "POST\n/s3/documents\ndelete=\nx-amz-content-sha256:{$payloadHash}\nx-amz-date:{$date}\n\n{$signedHeaders}\n{$payloadHash}";
+        $host = parse_url(config('app.url'), PHP_URL_HOST).(parse_url(config('app.url'), PHP_URL_PORT) ? ':'.parse_url(config('app.url'), PHP_URL_PORT) : '');
+        $signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+        $canonical = "POST\n/s3/documents\ndelete=\nhost:{$host}\nx-amz-content-sha256:{$payloadHash}\nx-amz-date:{$date}\n\n{$signedHeaders}\n{$payloadHash}";
         $stringToSign = "AWS4-HMAC-SHA256\n{$date}\n{$scope}\n".hash('sha256', $canonical);
-        $dateKey = hash_hmac('sha256', '20261118', 'AWS4'.$secret, true);
+        $dateKey = hash_hmac('sha256', $dateStamp, 'AWS4'.$secret, true);
         $regionKey = hash_hmac('sha256', 'us-east-1', $dateKey, true);
         $serviceKey = hash_hmac('sha256', 's3', $regionKey, true);
         $signingKey = hash_hmac('sha256', 'aws4_request', $serviceKey, true);
         $signature = hash_hmac('sha256', $stringToSign, $signingKey);
 
         return [
+            'HTTP_HOST' => 'localhost',
             'HTTP_AUTHORIZATION' => "AWS4-HMAC-SHA256 Credential={$key->access_key}/{$scope}, SignedHeaders={$signedHeaders}, Signature={$signature}",
             'HTTP_X_AMZ_CONTENT_SHA256' => $payloadHash,
             'HTTP_X_AMZ_DATE' => $date,

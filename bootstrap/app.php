@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CoordinateStorage;
 use App\Http\Middleware\S3ErrorResponse;
 use App\Http\Middleware\VerifyS3Signature;
 use App\Models\Bucket;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prependToGroup('web', CoordinateStorage::class);
         $middleware->preventRequestForgery(except: ['s3', 's3/*']);
         $middleware->alias(['s3.errors' => S3ErrorResponse::class, 's3.signature' => VerifyS3Signature::class]);
     })
@@ -40,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 413 => 'EntityTooLarge',
                 416 => 'InvalidRange',
                 500 => 'InternalError',
+                503 => 'ServiceUnavailable',
                 default => 'InvalidRequest',
             };
 

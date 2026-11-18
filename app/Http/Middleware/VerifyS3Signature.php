@@ -18,6 +18,12 @@ class VerifyS3Signature
             return $next($r);
         }
 
+        foreach (['X-Amz-Algorithm', 'X-Amz-Credential', 'X-Amz-SignedHeaders', 'X-Amz-Signature', 'X-Amz-Date', 'X-Amz-Expires'] as $parameter) {
+            if ($r->query($parameter) !== null && ! is_string($r->query($parameter))) {
+                return response('Malformed signature parameter.', 403);
+            }
+        }
+
         $isPresigned = $r->query('X-Amz-Algorithm') === 'AWS4-HMAC-SHA256';
         if ($isPresigned) {
             [$accessKey, $scope] = explode('/', (string) $r->query('X-Amz-Credential'), 2) + ['', ''];
@@ -30,12 +36,12 @@ class VerifyS3Signature
             } catch (\Throwable) {
                 return response('Invalid presigned date.', 403);
             }
-            if (! $issuedAt || $issuedAt->format('Ymd\\THis\\Z') !== $date || $issuedAt->isFuture() || $expires < 1 || $expires > 604800 || $issuedAt->addSeconds($expires)->isPast()) {
+            if (! $issuedAt || $issuedAt->format('Ymd\\THis\\Z') !== $date || $issuedAt->gt(now()->addMinutes(15)) || ! ctype_digit((string) $r->query('X-Amz-Expires', '')) || $expires < 1 || $expires > 604800 || $issuedAt->addSeconds($expires)->isPast()) {
                 return response('Presigned URL has expired.', 403);
             }
         } else {
             $h = $r->header('Authorization', '');
-            if (! preg_match('/Credential=([^\/]+)\/([^,]+),\s*SignedHeaders=([^,]+),\s*Signature=([a-f0-9]{64})/i', $h, $m)) {
+            if (! preg_match('/^AWS4-HMAC-SHA256 Credential=([^\/]+)\/([^,]+),\s*SignedHeaders=([^,]+),\s*Signature=([a-f0-9]{64})$/', $h, $m)) {
                 return response('Missing or malformed AWS Signature V4 authorization.', 403);
             }
 
@@ -52,7 +58,7 @@ class VerifyS3Signature
         }
 
         $parts = explode('/', $m[2]);
-        if (count($parts) !== 4 || $parts[2] !== 's3') {
+        if (count($parts) !== 4 || $parts[2] !== 's3' || $parts[3] !== 'aws4_request' || $parts[0] !== substr((string) $date, 0, 8)) {
             return response('Invalid credential scope.', 403);
         }
 
@@ -60,17 +66,38 @@ class VerifyS3Signature
             return response('Missing x-amz-date.', 403);
         }
 
-        $headers = '';
-        foreach (explode(';', $m[3]) as $n) {
-            $headers .= strtolower($n).':'.trim($r->header($n, ''))."\n";
+        if (! $isPresigned) {
+            try {
+                $issuedAt = Carbon::createFromFormat('!Ymd\\THis\\Z', $date, 'UTC');
+            } catch (\Throwable) {
+                return response('Invalid signature date.', 403);
+            }
+            if (! $issuedAt || $issuedAt->format('Ymd\\THis\\Z') !== $date || abs($issuedAt->getTimestamp() - now()->getTimestamp()) > 900) {
+                return response('Request time is outside the allowed window.', 403);
+            }
         }
 
-        $q = $r->query();
-        unset($q['X-Amz-Signature']);
-        foreach ($q as $name => $value) {
-            $q[$name] = $value ?? '';
+        $signedHeaders = explode(';', $m[3]);
+        $sortedHeaders = $signedHeaders;
+        sort($sortedHeaders, SORT_STRING);
+        if ($sortedHeaders !== $signedHeaders || count(array_unique($signedHeaders)) !== count($signedHeaders) || ! in_array('host', $signedHeaders, true) || ! preg_match('/^[a-f0-9]{64}$/', $m[4])) {
+            return response('Invalid signed headers or signature.', 403);
         }
-        ksort($q);
+        foreach (array_keys($r->headers->all()) as $name) {
+            if (str_starts_with($name, 'x-amz-') && $name !== 'x-amz-content-sha256' && ! in_array($name, $signedHeaders, true)) {
+                return response('An AWS header was not included in the signature.', 403);
+            }
+        }
+
+        $headers = '';
+        foreach ($signedHeaders as $n) {
+            if (! preg_match('/^[a-z0-9-]+$/', $n) || ! $r->headers->has($n)) {
+                return response('A signed header is missing.', 403);
+            }
+            $headers .= $n.':'.preg_replace('/\s+/', ' ', trim($r->header($n)))."\n";
+        }
+
+        $query = $this->canonicalQuery($r);
         $payload = $r->header('x-amz-content-sha256');
         if ($payload === null) {
             if ($isPresigned) {
@@ -83,7 +110,12 @@ class VerifyS3Signature
                 $payload = hash_final($context);
             }
         }
-        $canonical = $r->method()."\n/".ltrim($r->path(), '/')."\n".http_build_query($q, '', '&', PHP_QUERY_RFC3986)."\n".$headers."\n".$m[3]."\n".$payload;
+        if ($payload !== 'UNSIGNED-PAYLOAD' && ! preg_match('/^[a-f0-9]{64}$/', $payload)) {
+            return response('Unsupported payload signing mode.', 403);
+        }
+        $path = explode('?', $r->getRequestUri(), 2)[0];
+        $canonicalPath = implode('/', array_map(fn (string $segment) => rawurlencode(rawurldecode($segment)), explode('/', $path)));
+        $canonical = $r->method()."\n".$canonicalPath."\n".$query."\n".$headers."\n".$m[3]."\n".$payload;
         $string = "AWS4-HMAC-SHA256\n{$date}\n{$m[2]}\n".hash('sha256', $canonical);
         try {
             $secret = Crypt::decryptString($key->secret_encrypted);
@@ -127,6 +159,21 @@ class VerifyS3Signature
         $bucketName = $request->segment(2);
 
         return $bucketName === null || $bucketNames === [] || in_array($bucketName, $bucketNames, true);
+    }
+
+    private function canonicalQuery(Request $request): string
+    {
+        $query = explode('?', $request->getRequestUri(), 2)[1] ?? '';
+        $pairs = [];
+        foreach ($query === '' ? [] : explode('&', $query) as $pair) {
+            [$name, $value] = explode('=', $pair, 2) + ['', ''];
+            if (rawurldecode($name) !== 'X-Amz-Signature') {
+                $pairs[] = [rawurlencode(rawurldecode($name)), rawurlencode(rawurldecode($value))];
+            }
+        }
+        sort($pairs, SORT_REGULAR);
+
+        return implode('&', array_map(fn (array $pair) => $pair[0].'='.$pair[1], $pairs));
     }
 
     private function actionFor(Request $request): string

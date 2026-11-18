@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Bucket;
 use App\Models\ObjectRecord;
+use App\Services\StorageMutex;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -16,6 +17,16 @@ class PurgeDeletedObjects extends Command
 
     public function handle(): int
     {
+        return app(StorageMutex::class)->run(fn () => $this->purge());
+    }
+
+    private function purge(): int
+    {
+        if (app(StorageMutex::class)->hasPendingWrites()) {
+            $this->error('Run object-store:recover-writes before cleanup.');
+
+            return self::FAILURE;
+        }
         $cutoff = now()->subDays(max(0, config('object-store.trash_days')));
         $query = ObjectRecord::whereNotNull('deleted_at')->where('deleted_at', '<', $cutoff);
         if ($this->option('dry-run')) {

@@ -105,8 +105,18 @@ class DashboardController extends Controller
         abort_if($object->deleted_at !== null, 404);
         abort_unless(File::exists($object->path), 404);
 
-        return response()->download($object->path, basename($object->key), [
+        $stream = fopen($object->path, 'rb');
+        abort_if($stream === false, 404);
+
+        return response()->streamDownload(function () use ($stream): void {
+            try {
+                fpassthru($stream);
+            } finally {
+                fclose($stream);
+            }
+        }, basename($object->key), [
             'Content-Type' => $object->content_type ?: 'application/octet-stream',
+            'Content-Length' => $object->size,
         ]);
     }
 

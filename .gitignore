@@ -3,6 +3,7 @@
 .env
 .env.backup
 .env.production
+.env.cpanel
 .phpactor.json
 .phpunit.result.cache
 /.codex
@@ -20,6 +21,8 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/framework/object-store.lock
+/storage/framework/browser-smoke/
 /vendor
 _ide_helper.php
 Homestead.json

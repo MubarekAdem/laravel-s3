@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\MultipartUpload;
+use App\Services\StorageMutex;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
@@ -14,6 +15,16 @@ class PurgeMultipartUploads extends Command
 
     public function handle(): int
     {
+        return app(StorageMutex::class)->run(fn () => $this->purge());
+    }
+
+    private function purge(): int
+    {
+        if (app(StorageMutex::class)->hasPendingWrites()) {
+            $this->error('Run object-store:recover-writes before cleanup.');
+
+            return self::FAILURE;
+        }
         $query = MultipartUpload::where('updated_at', '<', now()->subHours(max(1, config('object-store.multipart_hours'))));
         if ($this->option('dry-run')) {
             $this->info('Would purge '.$query->count().' multipart upload(s).');
