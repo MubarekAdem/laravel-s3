@@ -4,6 +4,8 @@ Self-hosted object storage built entirely in Laravel. Store files on your own se
 
 Harbor runs without an AWS account or a separate object-storage service. It includes a cPanel deployment workflow for PHP hosting you control.
 
+Files are stored on your server's disk. Storage requests go directly to Harbor; they are not forwarded to Amazon S3. Use credentials issued by Harbor. S3 compatibility means compatible API requests and signatures. The signing region (default `us-east-1`) is a compatibility value, not a hosting location or an AWS connection.
+
 ## Features
 
 - **Storage API:** Signature V4 and presigned URLs, bucket operations, object uploads/downloads, metadata, copy, listing with continuation tokens, and bulk deletion.

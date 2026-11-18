@@ -36,6 +36,8 @@ class DeploymentEnvironmentTest extends TestCase
             $environment = Dotenv::parse(file_get_contents(base_path($template)));
 
             $this->assertNotEmpty($environment['OBJECT_STORE_REGION'], $template);
+            $this->assertArrayNotHasKey('AWS_ACCESS_KEY_ID', $environment, $template);
+            $this->assertArrayNotHasKey('AWS_SECRET_ACCESS_KEY', $environment, $template);
             $this->assertGreaterThan(0, (int) $environment['OBJECT_STORE_MAX_BYTES'], $template);
             $this->assertGreaterThanOrEqual(0, (int) $environment['OBJECT_STORE_TRASH_DAYS'], $template);
             $this->assertGreaterThan(0, (int) $environment['OBJECT_STORE_MULTIPART_HOURS'], $template);

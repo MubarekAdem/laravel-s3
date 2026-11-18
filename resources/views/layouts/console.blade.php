@@ -27,7 +27,7 @@
         <a href="{{ route('api.docs') }}" class="side-link"><x-console-icon name="book" /><span>API documentation</span><x-console-icon name="external" class="nav-external" /></a>
         <a href="{{ route('home') }}" class="side-link"><x-console-icon name="globe" /><span>Public site</span><x-console-icon name="external" class="nav-external" /></a>
     </nav>
-    <div class="sidebar-footer"><div class="local-label"><x-console-icon name="server" />Self-hosted storage</div><p>Running on your infrastructure.</p><span class="region-label">{{ config('object-store.region') }}</span></div>
+    <div class="sidebar-footer"><div class="local-label"><x-console-icon name="server" />Self-hosted storage</div><p>Running on your infrastructure.</p><span class="region-label">Local file storage</span></div>
     <div class="sidebar-account"><span class="avatar">{{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}</span><a class="sidebar-profile-link" href="{{ route('profile.edit') }}" aria-label="Manage my profile"><strong>{{ auth()->user()->name }}</strong><small>Workspace owner</small></a><form method="post" action="{{ url('/logout') }}">@csrf<button type="submit" class="sidebar-signout" title="Sign out" aria-label="Sign out"><x-console-icon name="logout" /></button></form></div>
 </aside>
 <div class="console-frame">

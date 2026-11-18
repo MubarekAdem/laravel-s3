@@ -34,14 +34,14 @@
             <a href="#errors">Errors &amp; retries</a><a href="#limits">Limits &amp; compatibility</a><a href="#ai-reference">AI resources</a>
         </nav>
         <div class="docs-sidebar-resources"><span>Build with the reference</span><a href="{{ route('api.openapi') }}"><x-console-icon name="download" />OpenAPI specification</a><a href="{{ route('ai.full') }}"><x-console-icon name="file" />Full text for AI clients</a></div>
-        <div class="docs-server-label"><span class="docs-server-dot"></span>Self-hosted endpoint<code>{{ config('object-store.region') }}</code></div>
+        <div class="docs-server-label"><span class="docs-server-dot"></span>Files stored on your server</div>
     </aside>
     <main id="main-content" tabindex="-1">
         <div class="docs-breadcrumb"><a href="{{ route('home') }}">Harbor Storage</a><x-console-icon name="chevron-right" /><span>API reference</span></div>
         @yield('content')
         <footer class="docs-footer"><span>Harbor Storage · Built with Laravel</span><a href="{{ route('ai.index') }}">llms.txt</a><a href="{{ route('api.openapi') }}">OpenAPI</a></footer>
     </main>
-    <aside class="docs-context" aria-label="Reference resources"><span>On this server</span><strong>Path-style S3</strong><p>Sign requests for this endpoint and region.</p><code>{{ config('object-store.region') }}</code><a href="#authentication">Signing requests</a><a href="#limits">Compatibility limits</a><hr><span>For your tools</span><a href="{{ route('api.openapi') }}">OpenAPI JSON</a><a href="{{ route('ai.index') }}">llms.txt</a><a href="{{ route('ai.full') }}">llms-full.txt</a></aside>
+    <aside class="docs-context" aria-label="Reference resources"><span>Your storage</span><strong>Hosted by you</strong><p>Files stay on your server. Storage requests go directly to Harbor.</p><a href="#authentication">Client authentication</a><a href="#limits">API compatibility</a><hr><span>For your tools</span><a href="{{ route('api.openapi') }}">OpenAPI JSON</a><a href="{{ route('ai.index') }}">llms.txt</a><a href="{{ route('ai.full') }}">llms-full.txt</a></aside>
 </div>
 </body>
 </html>

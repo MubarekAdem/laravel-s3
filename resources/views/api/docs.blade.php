@@ -6,7 +6,8 @@
             <span class="docs-version">Storage API reference</span>
             <h1>API documentation</h1>
             <p class="docs-intro">Use signed HTTP requests to store files on this server. The API uses S3-style paths, Signature V4 authentication, raw upload bodies, and XML control responses.</p>
-            <div class="docs-notice"><strong>API base URL</strong><br><code>{{ rtrim(config('app.url'), '/') }}/s3</code><br>Region: <code>{{ config('object-store.region') }}</code>. Use path-style addressing: <code>/s3/{bucket}/{key}</code>.</div>
+            <div class="docs-notice"><strong>Your Harbor API endpoint</strong><br><code>{{ rtrim(config('app.url'), '/') }}/s3</code><br>Object URL format: <code>/s3/{bucket}/{key}</code>. All storage requests go to this server.</div>
+            <p>Harbor stores files on your own server's disk. S3 compatibility describes the request format only; Harbor does not forward storage traffic to Amazon S3 or require AWS credentials.</p>
             <p>This is the reference for Harbor's implemented S3 subset. It is not a JSON REST API and does not require an AWS account. Browser session cookies and bearer tokens do not authenticate storage requests.</p>
         </section>
 
@@ -41,7 +42,7 @@ s3 "$ENDPOINT/media?list-type=2&amp;prefix=hello&amp;max-keys=50"</code></pre></
 
         <section id="authentication">
             <h2>Authentication &amp; permissions</h2>
-            <p>Sign requests using <code>AWS4-HMAC-SHA256</code>, service <code>s3</code>, and the region above. A client library can generate the signature. Keep the endpoint's <code>/s3</code> prefix in the canonical URI.</p>
+            <p>Sign requests using <code>AWS4-HMAC-SHA256</code>, service <code>s3</code>, and signing region <code>{{ config('object-store.region') }}</code>. This region is a compatibility value used to calculate signatures locally, not a storage location or an AWS connection. Use the access key and secret created in Harbor. A client library can generate the signature. Keep the endpoint's <code>/s3</code> prefix in the canonical URI.</p>
             <div class="docs-code"><button type="button" data-copy>Copy</button><pre><code>Authorization: AWS4-HMAC-SHA256 Credential=ACCESS_KEY/YYYYMMDD/REGION/s3/aws4_request, SignedHeaders=host;x-amz-date, Signature=64_HEX_CHARACTERS
 x-amz-date: YYYYMMDDTHHMMSSZ
 Host: your-storage-host</code></pre></div>
@@ -76,7 +77,7 @@ s3 "$ENDPOINT/media?location"
 s3 "$ENDPOINT/media?list-type=2&amp;prefix=images%2F&amp;max-keys=100"
 # Treat continuation tokens as opaque and URL-encode them.
 s3 "$ENDPOINT/media?prefix=images%2F&amp;continuation-token=TOKEN"</code></pre></div>
-            <p>The default region <code>us-east-1</code> has an empty LocationConstraint value. Other configured regions are returned as text.</p>
+            <p>For compatibility, the default signing region <code>us-east-1</code> has an empty LocationConstraint value. Other configured signing values are returned as text. This response does not describe where files are hosted; they remain on your server.</p>
         </section>
 
         <section id="objects">
