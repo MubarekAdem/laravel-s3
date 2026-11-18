@@ -16,7 +16,7 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $filters = request()->validate(['activity_bucket' => ['nullable', 'string', 'exists:buckets,name'], 'activity_action' => ['nullable', 'string', 'max:100']]);
+        $filters = request()->validate(['activity_bucket' => ['nullable', 'string', 'max:255'], 'activity_action' => ['nullable', 'string', 'max:100'], 'activity_search' => ['nullable', 'string', 'max:255'], 'usage_bucket' => ['nullable', 'string', 'max:255']]);
         $bucketRows = Bucket::query()
             ->withCount(['objects as active_objects_count' => fn ($query) => $query->whereNull('deleted_at')])
             ->withSum(['objects as active_bytes' => fn ($query) => $query->whereNull('deleted_at')], 'size')
@@ -26,10 +26,11 @@ class DashboardController extends Controller
         return view('dashboard', [
             'buckets' => $bucketRows->count(),
             'bucketRows' => $bucketRows,
+            'usageRows' => empty($filters['usage_bucket']) ? $bucketRows : $bucketRows->where('name', $filters['usage_bucket']),
             'objects' => ObjectRecord::whereNull('deleted_at')->count(),
             'bytes' => (int) ObjectRecord::whereNull('deleted_at')->sum('size'),
             'keys' => AccessKey::whereNull('revoked_at')->latest()->get(),
-            'events' => AuditEvent::query()->when($filters['activity_bucket'] ?? null, fn ($query, $bucket) => $query->where('bucket', $bucket))->when($filters['activity_action'] ?? null, fn ($query, $action) => $query->where('action', $action))->latest()->limit(8)->get(),
+            'events' => AuditEvent::query()->when($filters['activity_bucket'] ?? null, fn ($query, $bucket) => $query->where('bucket', $bucket))->when($filters['activity_action'] ?? null, fn ($query, $action) => $query->where('action', $action))->when($filters['activity_search'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query->where('actor', 'like', '%'.$search.'%')->orWhere('object_key', 'like', '%'.$search.'%')))->latest('id')->paginate(20, ['*'], 'activity_page')->withQueryString(),
             'activityFilters' => $filters,
         ]);
     }

@@ -140,16 +140,24 @@ class S3Controller extends Controller
             abort(404);
         }
 
+        $this->checkPreconditions($request, $o);
+        $validator = response('', 200, $this->objectHeaders($o));
+        if ($validator->isNotModified($request)) {
+            return $validator;
+        }
+
         $start = 0;
         $end = $o->size - 1;
         $status = 200;
-        if ($request->header('Range')) {
+        $ifRange = $request->header('If-Range');
+        $rangeAllowed = $ifRange === null || $ifRange === '"'.$o->etag.'"' || $ifRange === $o->updated_at->toRfc7231String();
+        if ($request->header('Range') && $rangeAllowed) {
             [$start, $end] = $this->range($request->header('Range'), $o->size);
             $status = 206;
         }
 
         $length = $end - $start + 1;
-        $headers = ['Content-Type' => $o->content_type ?: 'application/octet-stream', 'Content-Length' => $length, 'ETag' => '"'.$o->etag.'"', 'Accept-Ranges' => 'bytes'];
+        $headers = array_merge($this->objectHeaders($o), ['Content-Length' => $length, 'Accept-Ranges' => 'bytes']);
         if ($status === 206) {
             $headers['Content-Range'] = "bytes {$start}-{$end}/{$o->size}";
         }
@@ -167,12 +175,40 @@ class S3Controller extends Controller
         }, $status, $headers);
     }
 
-    public function head(string $bucket, string $key)
+    public function head(Request $request, string $bucket, string $key)
     {
         $object = $this->bucket($bucket)->objects()->where('key', $key)->whereNull('deleted_at')->firstOrFail();
         abort_unless(File::isFile($object->path), 404);
 
-        return response('', 200, ['Content-Type' => $object->content_type ?: 'application/octet-stream', 'Content-Length' => $object->size, 'ETag' => '"'.$object->etag.'"', 'Last-Modified' => $object->updated_at->toRfc7231String()]);
+        $this->checkPreconditions($request, $object);
+        $response = response('', 200, array_merge($this->objectHeaders($object), ['Content-Length' => $object->size, 'Accept-Ranges' => 'bytes']));
+        $response->isNotModified($request);
+
+        return $response;
+    }
+
+    private function objectHeaders(ObjectRecord $object): array
+    {
+        $headers = ['Content-Type' => $object->content_type ?: 'application/octet-stream', 'ETag' => '"'.$object->etag.'"', 'Last-Modified' => $object->updated_at->toRfc7231String()];
+        foreach ($object->metadata ?? [] as $name => $value) {
+            if (str_starts_with(strtolower($name), 'x-amz-meta-')) {
+                $headers[$name] = $value;
+            }
+        }
+
+        return $headers;
+    }
+
+    private function checkPreconditions(Request $request, ObjectRecord $object): void
+    {
+        $ifMatch = $request->header('If-Match');
+        if ($ifMatch !== null) {
+            $tags = array_map('trim', explode(',', $ifMatch));
+            abort_unless(in_array('*', $tags, true) || in_array('"'.$object->etag.'"', $tags, true), 412, 'Object ETag does not match.');
+        } elseif ($request->header('If-Unmodified-Since')) {
+            $timestamp = strtotime($request->header('If-Unmodified-Since'));
+            abort_if($timestamp !== false && $object->updated_at->getTimestamp() > $timestamp, 412, 'Object has been modified.');
+        }
     }
 
     public function delete(Request $r, string $bucket, string $key)

@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->preventRequestForgery(except: ['s3', 's3/*']);
         $middleware->alias(['s3.errors' => S3ErrorResponse::class, 's3.signature' => VerifyS3Signature::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

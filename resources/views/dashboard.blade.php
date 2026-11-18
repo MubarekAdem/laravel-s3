@@ -64,22 +64,24 @@
 
         <section class="card">
             <h2>Recent activity</h2>
-            <form method="get" class="scope-list"><input name="activity_bucket" value="{{ $activityFilters['activity_bucket'] ?? '' }}" placeholder="Bucket"><input name="activity_action" value="{{ $activityFilters['activity_action'] ?? '' }}" placeholder="Action"><button>Filter activity</button></form><table>
+            <form method="get" class="scope-list"><input name="activity_bucket" value="{{ $activityFilters['activity_bucket'] ?? '' }}" placeholder="Bucket" aria-label="Activity bucket"><input name="activity_action" value="{{ $activityFilters['activity_action'] ?? '' }}" placeholder="Action" aria-label="Activity action"><input name="activity_search" value="{{ $activityFilters['activity_search'] ?? '' }}" placeholder="Actor or object key" aria-label="Search activity"><button>Filter activity</button></form><table>
                 @forelse ($events as $event)
-                    <tr><td>{{ $event->action }}</td><td>{{ $event->bucket }}</td><td class="muted right">{{ $event->created_at->diffForHumans() }}</td></tr>
+                    <tr><td>{{ $event->action }}<br><span class="muted">{{ $event->actor }}</span></td><td>{{ $event->bucket }}<br><code>{{ $event->object_key }}</code></td><td class="muted right">{{ $event->created_at->diffForHumans() }}</td></tr>
                 @empty
                     <tr><td class="muted empty">No storage activity yet.</td></tr>
                 @endforelse
             </table>
+            @if ($events->hasPages())<nav aria-label="Activity pages">@if ($events->previousPageUrl())<a href="{{ $events->previousPageUrl() }}">Previous</a>@endif <span class="muted">Page {{ $events->currentPage() }} of {{ $events->lastPage() }}</span> @if ($events->nextPageUrl())<a href="{{ $events->nextPageUrl() }}">Next</a>@endif</nav>@endif
         </section>
     </div>
 
     <section class="card" style="margin-bottom:16px">
         <h2>Buckets</h2>
+        <form method="get" class="scope-list"><label class="field">Usage by bucket<input name="usage_bucket" value="{{ $activityFilters['usage_bucket'] ?? '' }}" placeholder="All buckets"></label><button>Filter usage</button></form>
         <div class="table-wrap"><table>
             <thead><tr><th>Name</th><th class="right">Objects</th><th class="right">Stored</th><th class="right">Quota</th><th></th></tr></thead>
             <tbody>
-            @forelse ($bucketRows as $bucket)
+            @forelse ($usageRows as $bucket)
                 <tr><td><code>{{ $bucket->name }}</code></td><td class="right">{{ number_format($bucket->active_objects_count) }}</td><td class="right">{{ number_format($bucket->active_bytes ?? 0) }} B</td><td class="right"><form method="post" action="{{ url('/buckets/'.$bucket->name) }}">@csrf @method('PATCH')<input type="number" name="quota_mb" min="1" value="{{ $bucket->quota_bytes ? (int) ($bucket->quota_bytes / 1048576) : '' }}" placeholder="No limit"><button>Save</button></form></td><td class="right"><a href="{{ url('/buckets/'.$bucket->name) }}">Browse</a> @if ($bucket->active_objects_count === 0)<form method="post" action="{{ url('/buckets/'.$bucket->name) }}">@csrf @method('DELETE')<button class="danger">Delete</button></form>@endif</td></tr>
             @empty
                 <tr><td colspan="5" class="muted empty">Create a bucket to begin storing objects.</td></tr>
@@ -95,6 +97,7 @@
                 @csrf
                 <div class="scope-list">
                     <label><input type="checkbox" name="scopes[]" value="read" checked> Read</label>
+                    <label><input type="checkbox" name="scopes[]" value="list" checked> List buckets and objects</label>
                     <label><input type="checkbox" name="scopes[]" value="write" checked> Write</label>
                     <label><input type="checkbox" name="scopes[]" value="delete"> Delete</label>
                 </div>

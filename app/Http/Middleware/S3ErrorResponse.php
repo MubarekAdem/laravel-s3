@@ -38,6 +38,7 @@ class S3ErrorResponse
                 403 => 'AccessDenied',
                 404 => 'NoSuchKey',
                 409 => 'Conflict',
+                412 => 'PreconditionFailed',
                 413 => 'EntityTooLarge',
                 416 => 'InvalidRange',
                 default => 'InvalidRequest',
