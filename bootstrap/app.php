@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\VerifyS3Signature;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -12,7 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['s3.signature' => \App\Http\Middleware\VerifyS3Signature::class]);
+        $middleware->alias(['s3.signature' => VerifyS3Signature::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
