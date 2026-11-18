@@ -23,7 +23,7 @@
         .flash { background: #164e63; } .notice { background: #14532d; } .errors { background: #7f1d1d; } .credentials { display: grid; gap: 12px; }
         .scope-list { display: flex; flex-wrap: wrap; gap: 10px 16px; margin: 12px 0; } .bucket-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 7px; margin: 10px 0 16px; }
         table { width: 100%; border-collapse: collapse; } td, th { padding: 11px 6px; border-bottom: 1px solid #24445f; text-align: left; vertical-align: middle; } th { color: #93a4b8; font-size: 12px; font-weight: 600; } .right { text-align: right; } .table-wrap { overflow-x: auto; }
-        code { color: #bae6fd; } .empty { padding: 10px 0; } @media (max-width: 720px) { main { padding: 28px 16px 48px; } header, .split { display: block; } header form { margin-top: 16px; } .split > * { margin-bottom: 16px; } .form-row { grid-template-columns: 1fr; } }
+        code { color: #bae6fd; } a { color: #67e8f9; font-weight: 700; text-decoration: none; } a:hover { text-decoration: underline; } .empty { padding: 10px 0; } @media (max-width: 720px) { main { padding: 28px 16px 48px; } header, .split { display: block; } header form { margin-top: 16px; } .split > * { margin-bottom: 16px; } .form-row { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -77,12 +77,12 @@
     <section class="card" style="margin-bottom:16px">
         <h2>Buckets</h2>
         <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th class="right">Objects</th><th class="right">Stored</th><th class="right">Quota</th></tr></thead>
+            <thead><tr><th>Name</th><th class="right">Objects</th><th class="right">Stored</th><th class="right">Quota</th><th></th></tr></thead>
             <tbody>
             @forelse ($bucketRows as $bucket)
-                <tr><td><code>{{ $bucket->name }}</code></td><td class="right">{{ number_format($bucket->active_objects_count) }}</td><td class="right">{{ number_format($bucket->active_bytes ?? 0) }} B</td><td class="right">{{ $bucket->quota_bytes ? number_format($bucket->quota_bytes) . ' B' : 'No limit' }}</td></tr>
+                <tr><td><code>{{ $bucket->name }}</code></td><td class="right">{{ number_format($bucket->active_objects_count) }}</td><td class="right">{{ number_format($bucket->active_bytes ?? 0) }} B</td><td class="right">{{ $bucket->quota_bytes ? number_format($bucket->quota_bytes) . ' B' : 'No limit' }}</td><td class="right"><a href="{{ url('/buckets/'.$bucket->name) }}">Browse</a></td></tr>
             @empty
-                <tr><td colspan="4" class="muted empty">Create a bucket to begin storing objects.</td></tr>
+                <tr><td colspan="5" class="muted empty">Create a bucket to begin storing objects.</td></tr>
             @endforelse
             </tbody>
         </table></div>

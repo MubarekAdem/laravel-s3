@@ -12,6 +12,9 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index']);
     Route::post('/buckets', [DashboardController::class, 'storeBucket']);
+    Route::get('/buckets/{bucket:name}', [DashboardController::class, 'showBucket']);
+    Route::get('/buckets/{bucket:name}/objects/{object}/download', [DashboardController::class, 'downloadObject'])->scopeBindings();
+    Route::delete('/buckets/{bucket:name}/objects/{object}', [DashboardController::class, 'destroyObject'])->scopeBindings();
     Route::post('/keys', [DashboardController::class, 'key']);
     Route::delete('/keys/{key}', [DashboardController::class, 'revoke']);
     Route::post('/logout', [AuthController::class, 'destroy']);

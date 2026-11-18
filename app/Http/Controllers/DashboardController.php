@@ -8,6 +8,7 @@ use App\Models\Bucket;
 use App\Models\ObjectRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 class DashboardController extends Controller
@@ -43,6 +44,49 @@ class DashboardController extends Controller
         ]);
 
         return back()->with('status', 'Bucket created.');
+    }
+
+    public function showBucket(Request $request, Bucket $bucket)
+    {
+        $data = $request->validate(['prefix' => ['nullable', 'string', 'max:1024']]);
+        $prefix = $data['prefix'] ?? '';
+        $objects = $bucket->objects()
+            ->whereNull('deleted_at')
+            ->when($prefix !== '', fn ($query) => $query->where('key', 'like', $prefix.'%'))
+            ->orderBy('key')
+            ->paginate(50)
+            ->withQueryString();
+
+        return view('buckets.show', [
+            'bucket' => $bucket,
+            'objects' => $objects,
+            'prefix' => $prefix,
+            'usedBytes' => (int) $bucket->objects()->whereNull('deleted_at')->sum('size'),
+        ]);
+    }
+
+    public function downloadObject(Bucket $bucket, ObjectRecord $object)
+    {
+        abort_unless(File::exists($object->path), 404);
+
+        return response()->download($object->path, basename($object->key), [
+            'Content-Type' => $object->content_type ?: 'application/octet-stream',
+        ]);
+    }
+
+    public function destroyObject(Request $request, Bucket $bucket, ObjectRecord $object)
+    {
+        $object->update(['deleted_at' => now()]);
+        AuditEvent::create([
+            'actor' => $request->user()?->email,
+            'action' => 'object.delete',
+            'bucket' => $bucket->name,
+            'object_key' => $object->key,
+            'ip' => $request->ip(),
+            'context' => ['method' => $request->method(), 'source' => 'owner-dashboard'],
+        ]);
+
+        return back()->with('status', 'Object moved to trash.');
     }
 
     public function key(Request $r)
