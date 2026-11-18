@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
 use App\Models\Bucket;
+use App\Models\ObjectRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 
@@ -52,14 +53,27 @@ class S3Controller extends Controller
     public function put(Request $r, string $bucket, string $key)
     {
         $b = $this->bucket($bucket);
-        if ($r->getContentLength() > config('object-store.max_bytes')) {
+        if (($r->getContentLength() ?? 0) > config('object-store.max_bytes')) {
             abort(413, 'Object exceeds configured size.');
-        }$p = $this->path($b, $key);
+        }
+
+        $p = $this->path($b, $key);
         File::ensureDirectoryExists(dirname($p));
-        $body = $r->getContent();
-        File::put($p, $body);
-        $o = $b->objects()->updateOrCreate(['key' => $key], ['path' => $p, 'size' => strlen($body), 'etag' => md5($body), 'content_type' => $r->header('Content-Type'), 'metadata' => collect($r->headers->all())->filter(fn ($v, $k) => str_starts_with($k, 'x-amz-meta-'))->map(fn ($v) => $v[0])->all(), 'is_public' => $r->header('x-amz-acl') === 'public-read', 'deleted_at' => null]);
-        $this->audit($r, 'object.put', $bucket, $key);
+        $source = $this->copySource($r);
+
+        if ($source) {
+            File::copy($source->path, $p);
+            $attributes = ['path' => $p, 'size' => $source->size, 'etag' => $source->etag, 'content_type' => $source->content_type, 'metadata' => $source->metadata, 'is_public' => $source->is_public, 'deleted_at' => null];
+            $action = 'object.copy';
+        } else {
+            $body = $r->getContent();
+            File::put($p, $body);
+            $attributes = ['path' => $p, 'size' => strlen($body), 'etag' => md5($body), 'content_type' => $r->header('Content-Type'), 'metadata' => collect($r->headers->all())->filter(fn ($v, $k) => str_starts_with($k, 'x-amz-meta-'))->map(fn ($v) => $v[0])->all(), 'is_public' => $r->header('x-amz-acl') === 'public-read', 'deleted_at' => null];
+            $action = 'object.put';
+        }
+
+        $o = $b->objects()->updateOrCreate(['key' => $key], $attributes);
+        $this->audit($r, $action, $bucket, $key);
 
         return response('', 200, ['ETag' => '"'.$o->etag.'"']);
     }
@@ -71,15 +85,28 @@ class S3Controller extends Controller
             abort(404);
         }
 
-return response()->file($o->path, ['Content-Type' => $o->content_type ?: 'application/octet-stream', 'ETag' => '"'.$o->etag.'"']);
+        return response()->file($o->path, ['Content-Type' => $o->content_type ?: 'application/octet-stream', 'ETag' => '"'.$o->etag.'"']);
     }
 
     public function delete(Request $r, string $bucket, string $key)
     {
         $o = $this->bucket($bucket)->objects()->where('key', $key)->whereNull('deleted_at')->firstOrFail();
         $o->update(['deleted_at' => now()]);
-        $this->audit($r,'object.delete',$bucket,$key);
+        $this->audit($r, 'object.delete', $bucket, $key);
 
-        return response('',204);
+        return response('', 204);
+    }
+
+    private function copySource(Request $request): ?ObjectRecord
+    {
+        $copySource = $request->header('x-amz-copy-source');
+
+        if (! $copySource) {
+            return null;
+        }
+
+        [$bucket, $key] = explode('/', ltrim(urldecode($copySource), '/'), 2);
+
+        return $this->bucket($bucket)->objects()->where('key', $key)->whereNull('deleted_at')->firstOrFail();
     }
 }
