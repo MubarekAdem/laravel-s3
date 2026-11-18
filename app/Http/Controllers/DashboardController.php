@@ -48,7 +48,7 @@ class DashboardController extends Controller
             'quota_bytes' => isset($data['quota_mb']) ? $data['quota_mb'] * 1024 * 1024 : null,
         ]);
 
-        return back()->with('status', 'Bucket created.');
+        return back(fallback: route('dashboard'))->with('status', 'Bucket created.');
     }
 
     public function updateBucket(Request $request, Bucket $bucket)
@@ -65,7 +65,7 @@ class DashboardController extends Controller
         });
         $this->auditOwner($request, 'bucket.quota.update', $bucket->name);
 
-        return back()->with('status', 'Bucket quota updated.');
+        return back(fallback: route('dashboard'))->with('status', 'Bucket quota updated.');
     }
 
     public function destroyBucket(Request $request, Bucket $bucket)
@@ -76,7 +76,7 @@ class DashboardController extends Controller
         $bucket->delete();
         $this->auditOwner($request, 'bucket.delete', $bucketName);
 
-        return redirect('/')->with('status', 'Bucket deleted.');
+        return redirect()->route('dashboard')->with('status', 'Bucket deleted.');
     }
 
     public function showBucket(Request $request, Bucket $bucket)
@@ -125,7 +125,7 @@ class DashboardController extends Controller
         $object->update(['deleted_at' => now()]);
         $this->auditOwner($request, 'object.delete', $bucket->name, $object->key);
 
-        return back()->with('status', 'Object moved to trash.');
+        return back(fallback: route('dashboard'))->with('status', 'Object moved to trash.');
     }
 
     public function restoreObject(Request $request, Bucket $bucket, ObjectRecord $object)
@@ -141,7 +141,7 @@ class DashboardController extends Controller
         });
         $this->auditOwner($request, 'object.restore', $bucket->name, $object->key);
 
-        return back()->with('status', 'Object restored.');
+        return back(fallback: route('dashboard'))->with('status', 'Object restored.');
     }
 
     public function purgeObject(Request $request, Bucket $bucket, ObjectRecord $object)
@@ -159,7 +159,7 @@ class DashboardController extends Controller
         });
         $this->auditOwner($request, 'object.purge', $bucket->name, $key);
 
-        return back()->with('status', 'Object permanently deleted.');
+        return back(fallback: route('dashboard'))->with('status', 'Object permanently deleted.');
     }
 
     public function key(Request $r)
@@ -168,14 +168,14 @@ class DashboardController extends Controller
         $secret = Str::random(40);
         $key = AccessKey::create(['access_key' => 'HBR'.strtoupper(Str::random(17)), 'secret_encrypted' => Crypt::encryptString($secret), 'scopes' => $data['scopes'] ?? ['*'], 'bucket_names' => $data['bucket_names'] ?? []]);
 
-        return back()->with('created_secret', [$key->access_key, $secret]);
+        return back(fallback: route('dashboard'))->with('created_secret', [$key->access_key, $secret]);
     }
 
     public function revoke(AccessKey $key)
     {
         $key->update(['revoked_at' => now()]);
 
-        return back();
+        return back(fallback: route('dashboard'));
     }
 
     public function updateKey(Request $request, AccessKey $key)
@@ -183,7 +183,7 @@ class DashboardController extends Controller
         $data = $request->validate(['scopes' => ['required', 'array', 'min:1'], 'scopes.*' => ['in:read,write,delete,list'], 'bucket_names' => ['array'], 'bucket_names.*' => ['string', 'exists:buckets,name']]);
         $key->update(['scopes' => $data['scopes'], 'bucket_names' => $data['bucket_names'] ?? []]);
 
-        return back()->with('status', 'Credential permissions updated.');
+        return back(fallback: route('dashboard'))->with('status', 'Credential permissions updated.');
     }
 
     private function auditOwner(Request $request, string $action, ?string $bucket = null, ?string $key = null): void

@@ -57,7 +57,7 @@ class OwnerStorageManagementTest extends TestCase
 
         $this->actingAs($owner)->patch('/buckets/media', ['quota_mb' => 256])->assertRedirect();
         $this->assertSame(268435456, $bucket->fresh()->quota_bytes);
-        $this->actingAs($owner)->delete('/buckets/media')->assertRedirect('/');
+        $this->actingAs($owner)->delete('/buckets/media')->assertRedirect('/dashboard');
         $this->assertModelMissing($bucket);
     }
 

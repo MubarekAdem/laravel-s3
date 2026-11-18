@@ -22,6 +22,7 @@
     <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
     @if ($errors->any())<div role="alert">@foreach ($errors->all() as $error)<p class="error">{{ $error }}</p>@endforeach</div>@endif
     <button>Sign in</button>
+    <p><a href="{{ route('home') }}">Home</a> · <a href="{{ route('api.docs') }}">API docs</a></p>
 </form>
 </body>
 </html>

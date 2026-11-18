@@ -12,7 +12,7 @@ class ExampleTest extends TestCase
      */
     public function test_unauthenticated_owner_dashboard_request_redirects_to_login(): void
     {
-        $response = $this->get('/');
+        $response = $this->get('/dashboard');
 
         $response->assertRedirect('/login');
     }

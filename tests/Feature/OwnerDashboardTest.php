@@ -14,16 +14,16 @@ class OwnerDashboardTest extends TestCase
     public function test_owner_can_open_dashboard(): void
     {
         $owner = User::factory()->create();
-        $this->actingAs($owner)->get('/')->assertOk()->assertSee('Object storage on this server.');
+        $this->actingAs($owner)->get('/dashboard')->assertOk()->assertSee('Object storage on this server.');
     }
 
     public function test_owner_can_create_and_revoke_a_credential(): void
     {
         $owner = User::factory()->create();
-        $this->actingAs($owner)->post('/keys', ['scopes' => ['read', 'write']])->assertRedirect('/');
+        $this->actingAs($owner)->post('/keys', ['scopes' => ['read', 'write']])->assertRedirect('/dashboard');
         $key = AccessKey::firstOrFail();
         $this->assertSame(['read', 'write'], $key->scopes);
-        $this->actingAs($owner)->delete('/keys/'.$key->id)->assertRedirect('/');
+        $this->actingAs($owner)->delete('/keys/'.$key->id)->assertRedirect('/dashboard');
         $this->assertNotNull($key->fresh()->revoked_at);
     }
 
@@ -31,10 +31,10 @@ class OwnerDashboardTest extends TestCase
     {
         $owner = User::factory()->create();
 
-        $this->actingAs($owner)->post('/buckets', ['name' => 'media-assets', 'quota_mb' => 512])->assertRedirect('/');
+        $this->actingAs($owner)->post('/buckets', ['name' => 'media-assets', 'quota_mb' => 512])->assertRedirect('/dashboard');
         $this->assertDatabaseHas('buckets', ['name' => 'media-assets', 'quota_bytes' => 536870912]);
 
-        $this->actingAs($owner)->post('/keys', ['scopes' => ['read'], 'bucket_names' => ['media-assets']])->assertRedirect('/');
+        $this->actingAs($owner)->post('/keys', ['scopes' => ['read'], 'bucket_names' => ['media-assets']])->assertRedirect('/dashboard');
 
         $this->assertSame(['media-assets'], AccessKey::firstOrFail()->bucket_names);
     }

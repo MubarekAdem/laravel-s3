@@ -5,12 +5,15 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\S3Controller;
 use Illuminate\Support\Facades\Route;
 
+Route::view('/', 'landing')->name('home');
+Route::view('/api/docs', 'api.docs')->name('api.docs');
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'create'])->name('login');
     Route::post('/login', [AuthController::class, 'store']);
 });
 Route::middleware('auth')->group(function () {
-    Route::get('/', [DashboardController::class, 'index']);
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/buckets', [DashboardController::class, 'storeBucket']);
     Route::get('/buckets/{bucket:name}', [DashboardController::class, 'showBucket']);
     Route::patch('/buckets/{bucket:name}', [DashboardController::class, 'updateBucket']);

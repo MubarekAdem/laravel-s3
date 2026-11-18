@@ -19,17 +19,17 @@ class AuthController extends Controller
         $data = $r->validate(['email' => ['required', 'email'], 'password' => ['required']]);
         $throttleKey = 'owner-login:'.hash('sha256', Str::lower($data['email']).'|'.$r->ip());
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
-            return back()->withErrors(['email' => 'Too many login attempts. Try again in '.RateLimiter::availableIn($throttleKey).' seconds.'])->onlyInput('email');
+            return back(fallback: route('login'))->withErrors(['email' => 'Too many login attempts. Try again in '.RateLimiter::availableIn($throttleKey).' seconds.'])->onlyInput('email');
         }
         if (! Auth::attempt($data, $r->boolean('remember'))) {
             RateLimiter::hit($throttleKey, 60);
 
-            return back()->withErrors(['email' => 'Those credentials do not match our records.'])->onlyInput('email');
+            return back(fallback: route('login'))->withErrors(['email' => 'Those credentials do not match our records.'])->onlyInput('email');
         }
         RateLimiter::clear($throttleKey);
         $r->session()->regenerate();
 
-        return redirect()->intended('/');
+        return redirect()->intended(route('dashboard'));
     }
 
     public function destroy(Request $r)

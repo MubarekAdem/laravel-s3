@@ -19,8 +19,8 @@
 <body>
 <main>
     <div class="toolbar">
-        <div><p class="eyebrow"><a href="{{ url('/') }}">Harbor Storage</a> / bucket inventory</p><h1><code>{{ $bucket->name }}</code></h1></div>
-        <a href="{{ url('/') }}">Back to control room</a>
+        <div><p class="eyebrow"><a href="{{ route('dashboard') }}">Harbor Storage</a> / bucket inventory</p><h1><code>{{ $bucket->name }}</code></h1></div>
+        <a href="{{ route('dashboard') }}">Back to control room</a>
     </div>
 
     @if (session('status')) <p class="notice">{{ session('status') }}</p> @endif

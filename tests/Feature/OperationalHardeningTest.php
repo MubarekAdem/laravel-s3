@@ -32,7 +32,7 @@ class OperationalHardeningTest extends TestCase
 
         $this->assertGuest();
         $this->travel(61)->seconds();
-        $this->post('/login', ['email' => $owner->email, 'password' => 'correct-password'])->assertRedirect('/');
+        $this->post('/login', ['email' => $owner->email, 'password' => 'correct-password'])->assertRedirect('/dashboard');
         $this->assertAuthenticatedAs($owner);
     }
 
@@ -63,8 +63,8 @@ class OperationalHardeningTest extends TestCase
         }
         AuditEvent::create(['action' => 'object.put', 'bucket' => 'other', 'object_key' => 'unrelated']);
 
-        $this->actingAs($owner)->get('/?activity_bucket=removed-bucket&activity_search=report')
+        $this->actingAs($owner)->get('/dashboard?activity_bucket=removed-bucket&activity_search=report')
             ->assertOk()->assertSee('Page 1 of 2')->assertSee('report-20')->assertDontSee('unrelated');
-        $this->get('/?activity_bucket=removed-bucket&activity_search=report&activity_page=2')->assertOk()->assertSee('report-0');
+        $this->get('/dashboard?activity_bucket=removed-bucket&activity_search=report&activity_page=2')->assertOk()->assertSee('report-0');
     }
 }

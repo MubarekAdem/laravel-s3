@@ -70,6 +70,16 @@ try {
     const evaluate = async expression => (await page('Runtime.evaluate', {expression, returnByValue: true})).result.value;
     await page('Page.enable');
     await page('Runtime.enable');
+    for (const [path, name, selector] of [['/', 'landing', '#hero-title'], ['/api/docs', 'api-docs', '.docs-main h1']]) {
+        for (const width of [1280, 390]) {
+            await page('Emulation.setDeviceMetricsOverride', {width, height: 900, deviceScaleFactor: 1, mobile: false});
+            await page('Page.navigate', {url: base + path});
+            await until(() => evaluate(`!!document.querySelector(${JSON.stringify(selector)})`), name);
+            if (await evaluate('document.documentElement.scrollWidth > innerWidth')) throw new Error(name + ' overflows at ' + width);
+            const screenshot = await page('Page.captureScreenshot', {format: 'png'});
+            await writeFile(join(screenshots, `${name}-${width}.png`), Buffer.from(screenshot.data, 'base64'));
+        }
+    }
     for (const width of [1280, 390]) {
         await page('Emulation.setDeviceMetricsOverride', {width, height: 900, deviceScaleFactor: 1, mobile: false});
         await page('Page.navigate', {url: base + '/login'});
@@ -90,7 +100,7 @@ try {
     await until(() => evaluate('!!document.querySelector("select[name=state]")'), 'bucket inventory');
     if (await evaluate('document.documentElement.scrollWidth > innerWidth')) throw new Error('Bucket inventory overflows on mobile');
     if (exceptions.length) throw new Error(exceptions.join('\n'));
-    console.log('Browser smoke passed: login, authenticated dashboard, bucket inventory; desktop and mobile. Screenshots: storage/framework/browser-smoke.');
+    console.log('Browser smoke passed: landing, API docs, login, authenticated dashboard, bucket inventory; desktop and mobile. Screenshots: storage/framework/browser-smoke.');
 } finally {
     if (socket?.readyState === WebSocket.OPEN) { try { await call('Browser.close'); } catch {} socket.close(); }
     browser?.kill();

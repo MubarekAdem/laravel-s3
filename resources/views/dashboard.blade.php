@@ -30,7 +30,7 @@
 <main>
     <header>
         <div>
-            <p class="eyebrow">Harbor Storage / control room</p>
+            <p class="eyebrow"><a href="{{ route('home') }}">Harbor Storage</a> / control room · <a href="{{ route('api.docs') }}">API docs</a></p>
             <h1>Object storage on this server.</h1>
         </div>
         <form method="post" action="/logout">@csrf <button>Sign out</button></form>
