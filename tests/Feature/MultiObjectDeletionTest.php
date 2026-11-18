@@ -81,6 +81,24 @@ class MultiObjectDeletionTest extends TestCase
         $this->assertNotNull($object->fresh()->deleted_at);
     }
 
+    public function test_signed_payload_cannot_be_replaced_after_signing(): void
+    {
+        Bucket::create(['name' => 'documents']);
+        $secret = 'payload-integrity-secret';
+        $key = AccessKey::create([
+            'access_key' => 'HBRPAYLOADCHECK',
+            'secret_encrypted' => Crypt::encryptString($secret),
+            'scopes' => ['delete'],
+            'bucket_names' => ['documents'],
+        ]);
+        $original = $this->deleteXml(['original.txt']);
+
+        $this->call('POST', '/s3/documents?delete', [], [], [], $this->signedHeaders($key, $secret, $original), $this->deleteXml(['replacement.txt']))
+            ->assertForbidden()->assertSee('Payload hash does not match.');
+
+        $this->assertDatabaseCount('audit_events', 0);
+    }
+
     private function deleteXml(array $keys): string
     {
         return '<Delete xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'.collect($keys)->map(fn (string $key) => '<Object><Key>'.$key.'</Key></Object>')->implode('').'</Delete>';

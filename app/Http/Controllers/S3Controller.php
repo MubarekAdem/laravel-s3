@@ -36,7 +36,9 @@ class S3Controller extends Controller
 
     public function buckets()
     {
-        return $this->xml(['buckets' => Bucket::orderBy('name')->get()]);
+        $allowed = request()->attributes->get('s3_key')?->bucket_names ?? [];
+
+        return $this->xml(['buckets' => Bucket::query()->when($allowed !== [], fn ($query) => $query->whereIn('name', $allowed))->orderBy('name')->get()]);
     }
 
     public function createBucket(Request $r, string $bucket)
@@ -58,7 +60,7 @@ class S3Controller extends Controller
     {
         $bucketModel = $this->bucket($bucket);
 
-        if ($bucketModel->objects()->exists()) {
+        if ($bucketModel->objects()->exists() || $bucketModel->multipartUploads()->exists()) {
             abort(409, 'Bucket must be empty before it can be deleted.');
         }
 
@@ -72,6 +74,9 @@ class S3Controller extends Controller
     public function list(Request $r, string $bucket)
     {
         $b = $this->bucket($bucket);
+        if ($r->has('location')) {
+            return response()->view('s3.location', ['region' => config('object-store.region')], 200, ['Content-Type' => 'application/xml']);
+        }
         $maxKeys = min(max($r->integer('max-keys', 1000), 1), 1000);
         $prefix = $r->string('prefix')->toString();
         $continuationToken = $r->string('continuation-token')->toString();
@@ -166,6 +171,7 @@ class S3Controller extends Controller
     public function head(string $bucket, string $key)
     {
         $object = $this->bucket($bucket)->objects()->where('key', $key)->whereNull('deleted_at')->firstOrFail();
+        abort_unless(File::isFile($object->path), 404);
 
         return response('', 200, ['Content-Type' => $object->content_type ?: 'application/octet-stream', 'Content-Length' => $object->size, 'ETag' => '"'.$object->etag.'"', 'Last-Modified' => $object->updated_at->toRfc7231String()]);
     }
@@ -320,6 +326,12 @@ class S3Controller extends Controller
         }
 
         [$bucket, $key] = explode('/', ltrim(urldecode($copySource), '/'), 2);
+        $credential = $request->attributes->get('s3_key');
+        if ($credential !== null) {
+            $scopes = $credential->scopes ?? [];
+            $allowedBuckets = $credential->bucket_names ?? [];
+            abort_unless((in_array('*', $scopes, true) || in_array('read', $scopes, true)) && ($allowedBuckets === [] || in_array($bucket, $allowedBuckets, true)), 403, 'Copy source access denied.');
+        }
 
         return $this->bucket($bucket)->objects()->where('key', $key)->whereNull('deleted_at')->firstOrFail();
     }
@@ -341,6 +353,7 @@ class S3Controller extends Controller
     private function range(string $header, int $size): array
     {
         abort_unless(preg_match('/^bytes=(\d*)-(\d*)$/', $header, $matches), 416, 'Invalid byte range.');
+        abort_if($matches[1] === '' && ($matches[2] === '' || (int) $matches[2] === 0), 416, 'Invalid byte range.');
         $start = $matches[1] === '' ? max($size - (int) $matches[2], 0) : (int) $matches[1];
         $end = $matches[2] === '' || $matches[1] === '' ? $size - 1 : min((int) $matches[2], $size - 1);
         abort_if($size === 0 || $start > $end || $start >= $size, 416, 'Requested range is not satisfiable.');

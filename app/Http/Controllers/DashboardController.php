@@ -8,6 +8,7 @@ use App\Models\Bucket;
 use App\Models\ObjectRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
@@ -107,7 +108,15 @@ class DashboardController extends Controller
 
     public function restoreObject(Request $request, Bucket $bucket, ObjectRecord $object)
     {
-        $object->update(['deleted_at' => null]);
+        DB::transaction(function () use ($bucket, $object): void {
+            $lockedBucket = Bucket::query()->lockForUpdate()->findOrFail($bucket->id);
+            $storedObject = $lockedBucket->objects()->findOrFail($object->id);
+            if ($storedObject->deleted_at !== null) {
+                $used = (int) $lockedBucket->objects()->whereNull('deleted_at')->sum('size');
+                abort_if($lockedBucket->quota_bytes !== null && $used + $storedObject->size > $lockedBucket->quota_bytes, 409, 'Restoring this object would exceed the bucket quota.');
+                $storedObject->update(['deleted_at' => null]);
+            }
+        });
         $this->auditOwner($request, 'object.restore', $bucket->name, $object->key);
 
         return back()->with('status', 'Object restored.');
@@ -129,7 +138,7 @@ class DashboardController extends Controller
 
     public function key(Request $r)
     {
-        $data = $r->validate(['scopes' => ['array'], 'bucket_names' => ['array'], 'bucket_names.*' => ['string', 'exists:buckets,name']]);
+        $data = $r->validate(['scopes' => ['required', 'array', 'min:1'], 'scopes.*' => ['in:read,write,delete,list'], 'bucket_names' => ['array'], 'bucket_names.*' => ['string', 'exists:buckets,name']]);
         $secret = Str::random(40);
         $key = AccessKey::create(['access_key' => 'HBR'.strtoupper(Str::random(17)), 'secret_encrypted' => Crypt::encryptString($secret), 'scopes' => $data['scopes'] ?? ['*'], 'bucket_names' => $data['bucket_names'] ?? []]);
 
@@ -145,7 +154,7 @@ class DashboardController extends Controller
 
     public function updateKey(Request $request, AccessKey $key)
     {
-        $data = $request->validate(['scopes' => ['required', 'array', 'min:1'], 'scopes.*' => ['in:read,write,delete'], 'bucket_names' => ['array'], 'bucket_names.*' => ['string', 'exists:buckets,name']]);
+        $data = $request->validate(['scopes' => ['required', 'array', 'min:1'], 'scopes.*' => ['in:read,write,delete,list'], 'bucket_names' => ['array'], 'bucket_names.*' => ['string', 'exists:buckets,name']]);
         $key->update(['scopes' => $data['scopes'], 'bucket_names' => $data['bucket_names'] ?? []]);
 
         return back()->with('status', 'Credential permissions updated.');

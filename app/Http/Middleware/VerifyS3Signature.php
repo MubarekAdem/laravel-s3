@@ -25,7 +25,12 @@ class VerifyS3Signature
             $date = (string) $r->query('X-Amz-Date');
             $expires = (int) $r->query('X-Amz-Expires', 0);
 
-            if ($date === '' || $expires < 1 || $expires > 604800 || Carbon::createFromFormat('Ymd\\THis\\Z', $date, 'UTC')->addSeconds($expires)->isPast()) {
+            try {
+                $issuedAt = Carbon::createFromFormat('!Ymd\\THis\\Z', $date, 'UTC');
+            } catch (\Throwable) {
+                return response('Invalid presigned date.', 403);
+            }
+            if (! $issuedAt || $issuedAt->format('Ymd\\THis\\Z') !== $date || $issuedAt->isFuture() || $expires < 1 || $expires > 604800 || $issuedAt->addSeconds($expires)->isPast()) {
                 return response('Presigned URL has expired.', 403);
             }
         } else {
@@ -66,7 +71,18 @@ class VerifyS3Signature
             $q[$name] = $value ?? '';
         }
         ksort($q);
-        $payload = $r->header('x-amz-content-sha256', $isPresigned ? 'UNSIGNED-PAYLOAD' : hash('sha256', $r->getContent()));
+        $payload = $r->header('x-amz-content-sha256');
+        if ($payload === null) {
+            if ($isPresigned) {
+                $payload = 'UNSIGNED-PAYLOAD';
+            } else {
+                $stream = $r->getContent(true);
+                $context = hash_init('sha256');
+                hash_update_stream($context, $stream);
+                rewind($stream);
+                $payload = hash_final($context);
+            }
+        }
         $canonical = $r->method()."\n/".ltrim($r->path(), '/')."\n".http_build_query($q, '', '&', PHP_QUERY_RFC3986)."\n".$headers."\n".$m[3]."\n".$payload;
         $string = "AWS4-HMAC-SHA256\n{$date}\n{$m[2]}\n".hash('sha256', $canonical);
         try {
@@ -83,6 +99,16 @@ class VerifyS3Signature
             return response('Signature does not match.', 403);
         }
 
+        if (preg_match('/^[a-f0-9]{64}$/', $payload)) {
+            $stream = $r->getContent(true);
+            $context = hash_init('sha256');
+            hash_update_stream($context, $stream);
+            rewind($stream);
+            if (! hash_equals($payload, hash_final($context))) {
+                return response('Payload hash does not match.', 403);
+            }
+        }
+
         $key->forceFill(['last_used_at' => now()])->save();
         $r->attributes->set('s3_key', $key);
 
@@ -93,11 +119,7 @@ class VerifyS3Signature
     {
         $scopes = $key->scopes ?? [];
 
-        if (in_array('*', $scopes, true)) {
-            return true;
-        }
-
-        if (! in_array($this->actionFor($request), $scopes, true)) {
+        if (! in_array('*', $scopes, true) && ! in_array($this->actionFor($request), $scopes, true)) {
             return false;
         }
 
@@ -117,7 +139,7 @@ class VerifyS3Signature
             return 'write';
         }
 
-        return count($request->segments()) > 2 ? 'read' : 'list';
+        return count($request->segments()) > 2 || $request->has('location') || $request->isMethod('HEAD') ? 'read' : 'list';
     }
 
     private function allowsPublicRead(Request $request): bool
