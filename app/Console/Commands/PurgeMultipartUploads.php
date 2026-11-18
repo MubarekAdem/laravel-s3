@@ -14,7 +14,7 @@ class PurgeMultipartUploads extends Command
 
     public function handle(): int
     {
-        $uploads = MultipartUpload::where('created_at', '<', now()->subHours(config('object-store.multipart_hours')))->get();
+        $uploads = MultipartUpload::where('updated_at', '<', now()->subHours(max(1, config('object-store.multipart_hours'))))->get();
         foreach ($uploads as $upload) {
             File::deleteDirectory(config('object-store.root').DIRECTORY_SEPARATOR.'multipart'.DIRECTORY_SEPARATOR.$upload->upload_id);
             $upload->delete();

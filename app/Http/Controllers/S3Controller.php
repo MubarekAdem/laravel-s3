@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
 use App\Models\Bucket;
-use App\Models\MultipartPart;
 use App\Models\MultipartUpload;
 use App\Models\ObjectRecord;
 use Illuminate\Http\Request;
@@ -259,6 +258,7 @@ class S3Controller extends Controller
             File::delete($temporaryPart['path']);
         }
         $part = $upload->parts()->updateOrCreate(['part_number' => $partNumber], ['path' => $path, 'size' => $temporaryPart['size'], 'etag' => $temporaryPart['etag']]);
+        $upload->touch();
         $this->audit($request, 'multipart.part.put', $bucket, $key);
 
         return response('', 200, ['ETag' => '"'.$part->etag.'"']);
@@ -270,22 +270,44 @@ class S3Controller extends Controller
         $parts = $upload->parts()->orderBy('part_number')->get();
         abort_if($parts->isEmpty(), 400, 'Multipart upload has no parts.');
         $requestedParts = $this->completedParts($request->getContent());
-        $storedParts = $parts->map(fn (MultipartPart $part) => ['number' => (int) $part->part_number, 'etag' => $part->etag])->all();
-        abort_if($requestedParts !== $storedParts, 400, 'Multipart completion parts do not match uploaded parts.');
+        abort_if($requestedParts === [] || count($requestedParts) > 10000, 400, 'Invalid multipart part count.');
+        $availableParts = $parts->keyBy('part_number');
+        $selectedParts = collect();
+        $previousNumber = 0;
+        foreach ($requestedParts as $requestedPart) {
+            abort_if($requestedPart['number'] <= $previousNumber, 400, 'Multipart parts must be in ascending order.');
+            $part = $availableParts->get($requestedPart['number']);
+            abort_if($part === null || ! hash_equals($part->etag, $requestedPart['etag']), 400, 'Multipart completion parts do not match uploaded parts.');
+            abort_unless(File::isFile($part->path), 400, 'Multipart part file is missing.');
+            $selectedParts->push($part);
+            $previousNumber = $requestedPart['number'];
+        }
+        $parts = $selectedParts;
         $size = $parts->sum('size');
         $etag = DB::transaction(function () use ($bucket, $key, $size, $parts, $upload) {
             $bucketModel = Bucket::query()->lockForUpdate()->where('name', $bucket)->firstOrFail();
             $this->ensureWithinQuota($bucketModel, $key, $size);
             $path = $this->path($bucketModel, $key);
             File::ensureDirectoryExists(dirname($path));
-            $destination = fopen($path, 'wb');
-            foreach ($parts as $part) {
-                $source = fopen($part->path, 'rb');
-                stream_copy_to_stream($source, $destination);
-                fclose($source);
+            $temporaryPath = $path.'.'.Str::uuid().'.assembly';
+            $destination = fopen($temporaryPath, 'wb');
+            try {
+                foreach ($parts as $part) {
+                    $source = fopen($part->path, 'rb');
+                    try {
+                        abort_if(stream_copy_to_stream($source, $destination) !== (int) $part->size, 500, 'Multipart part could not be assembled.');
+                    } finally {
+                        fclose($source);
+                    }
+                }
+            } catch (\Throwable $exception) {
+                fclose($destination);
+                File::delete($temporaryPath);
+                throw $exception;
             }
             fclose($destination);
-            $etag = md5_file($path);
+            $etag = md5($parts->map(fn ($part) => hex2bin($part->etag))->implode('')).'-'.$parts->count();
+            abort_unless(File::move($temporaryPath, $path), 500, 'Multipart object could not be published.');
             $bucketModel->objects()->updateOrCreate(['key' => $key], ['path' => $path, 'size' => $size, 'etag' => $etag, 'content_type' => $upload->content_type, 'metadata' => $upload->metadata, 'is_public' => $upload->is_public, 'deleted_at' => null]);
 
             return $etag;
