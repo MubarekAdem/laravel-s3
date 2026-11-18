@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Bucket;
-use App\Models\ObjectRecord;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,7 +23,7 @@ class BucketDeletionTest extends TestCase
     public function test_bucket_with_objects_returns_conflict_and_is_preserved(): void
     {
         $bucket = Bucket::create(['name' => 'occupied']);
-        ObjectRecord::create(['bucket_id' => $bucket->id, 'key' => 'report.txt', 'path' => storage_path('app/object-store/test-file'), 'size' => 1, 'etag' => md5('x')]);
+        $bucket->objects()->create(['key' => 'report.txt', 'path' => storage_path('app/object-store/test-file'), 'size' => 1, 'etag' => md5('x')]);
 
         $response = $this->withoutMiddleware()->delete('/s3/occupied');
 
