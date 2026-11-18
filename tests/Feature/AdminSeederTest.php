@@ -49,16 +49,14 @@ class AdminSeederTest extends TestCase
         $this->assertDatabaseCount('users', 1);
     }
 
-    public function test_weak_environment_password_is_rejected(): void
+    public function test_short_environment_password_can_be_used_to_sign_in(): void
     {
         config(['admin.name' => 'Owner', 'admin.email' => 'local-admin@example.com', 'admin.password' => 'short']);
-        try {
-            $this->seed(AdminSeeder::class);
-            $this->fail('Weak credentials must not create an admin.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('password', $exception->errors());
-            $this->assertDatabaseCount('users', 0);
-        }
+        $this->seed(AdminSeeder::class);
+
+        $this->assertTrue(Hash::check('short', User::sole()->password));
+        $this->post('/login', ['email' => 'local-admin@example.com', 'password' => 'short'])->assertRedirect('/dashboard');
+        $this->assertAuthenticated();
     }
 
     public function test_partially_configured_credentials_are_rejected(): void

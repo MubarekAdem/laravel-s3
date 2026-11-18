@@ -31,7 +31,7 @@ class AdminSeeder extends Seeder
         ], [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:12'],
+            'password' => ['required', 'string'],
         ])->validate();
         if (Hash::getDefaultDriver() === 'bcrypt' && (strlen($data['password']) > 72 || str_contains($data['password'], "\0"))) {
             throw ValidationException::withMessages(['password' => 'Bcrypt passwords must be at most 72 bytes and contain no null bytes.']);

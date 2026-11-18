@@ -22,6 +22,16 @@ class CreateOwnerTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_owner_can_be_created_with_a_short_confirmed_password(): void
+    {
+        $this->artisan('object-store:owner', ['email' => 'short-password@example.com'])
+            ->expectsQuestion('Password', 'short')
+            ->expectsQuestion('Confirm password', 'short')
+            ->assertSuccessful();
+
+        $this->assertTrue(Hash::check('short', User::sole()->password));
+    }
+
     public function test_creates_an_owner_with_a_confirmed_twelve_character_password(): void
     {
         $this->artisan('object-store:owner', ['email' => ' owner@example.com ', '--name' => ' Storage Owner '])
@@ -141,7 +151,6 @@ class CreateOwnerTest extends TestCase
         return [
             'empty' => ['', '', 'password field is required'],
             'unanswered' => [null, null, 'password field is required'],
-            'eleven characters' => ['12345678901', '12345678901', 'at least 12 characters'],
             'mismatch' => ['a-long-password', 'a-different-password', 'confirmation does not match'],
             'missing confirmation' => ['a-long-password', null, 'confirmation does not match'],
             'bcrypt byte limit' => [str_repeat('p', 73), str_repeat('p', 73), 'at most 72 bytes'],

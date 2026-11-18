@@ -56,9 +56,9 @@ chmod -R u+rwX,go-rwx storage bootstrap/cache
 "$PHP" artisan optimize --no-interaction
 ```
 
-Owner creation requires interactive hidden password entry and confirmation, with at least 12 characters. It deliberately cannot run with `--no-interaction`. No password argument or environment variable is accepted. Fix any failing readiness check before opening access. Do not create a public storage symlink for private object data.
+Owner creation requires interactive hidden password entry and confirmation. A nonempty password is required; there is no minimum length. It deliberately cannot run with `--no-interaction`. No password argument or environment variable is accepted by this interactive command. Fix any failing readiness check before opening access. Do not create a public storage symlink for private object data.
 
-Alternatively, create the initial owner from `.env` with `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` (minimum 12 characters; bcrypt allows at most 72 bytes). Clear configuration with `artisan config:clear`, then run `artisan db:seed --class=AdminSeeder --force --no-interaction` instead of the interactive owner-creation command. The seeder never overwrites an existing email's credentials and does not create a demo user. Leave both email and password blank to skip seeding; partial credentials fail validation. Keep the populated `.env` private, remove the bootstrap password after initial creation if no longer needed, and rebuild cached configuration afterward. Password resets continue to use the explicit interactive recovery command below.
+Alternatively, create the initial owner from `.env` with `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` (nonempty; bcrypt allows at most 72 bytes). Clear configuration with `artisan config:clear`, then run `artisan db:seed --class=AdminSeeder --force --no-interaction` instead of the interactive owner-creation command. The seeder never overwrites an existing email's credentials and does not create a demo user. Leave both email and password blank to skip seeding; partial credentials fail validation. Keep the populated `.env` private, remove the bootstrap password after initial creation if no longer needed, and rebuild cached configuration afterward. Password resets continue to use the explicit interactive recovery command below.
 
 6. Add this cPanel cron as the same account, replacing both absolute paths. This runs the configured daily trash purge and hourly abandoned multipart purge. Keep cron error output available during setup; once verified, the example appends it to a private log. Arrange rotation for that log.
 
@@ -152,7 +152,7 @@ Restrict shell and cPanel access: any shell operator who can run this command ca
 "$PHP" artisan object-store:owner owner@example.com --reset
 ```
 
-Enter the new password twice in the hidden prompts. Invalid email/name, passwords shorter than 12 characters, or mismatched confirmation fail without changing credentials. An existing owner requires `--reset`; a nonexistent owner with `--reset` fails to catch address typos. The name stays unchanged unless `--name="New Name"` is supplied. When creating a new owner, the name defaults to `Owner`.
+Enter the new password twice in the hidden prompts. Invalid email/name, empty passwords, or mismatched confirmation fail without changing credentials. An existing owner requires `--reset`; a nonexistent owner with `--reset` fails to catch address typos. The name stays unchanged unless `--name="New Name"` is supplied. When creating a new owner, the name defaults to `Owner`.
 
 With the default bcrypt hasher, passwords must also fit within 72 bytes and contain no null bytes; multibyte characters use more than one byte. This prevents silent password truncation.
 

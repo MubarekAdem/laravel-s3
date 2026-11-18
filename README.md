@@ -49,7 +49,7 @@ Before running the seed command, set your initial owner in `.env`:
 ```dotenv
 ADMIN_NAME="Storage Owner"
 ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD="choose-a-unique-password-at-least-12-characters"
+ADMIN_PASSWORD="choose-your-password"
 ```
 
 Run `php artisan config:clear` after changing these values. `AdminSeeder` hashes the password and creates the account only if that email does not already exist. It never resets an existing password. `php artisan db:seed` also runs this seeder; it no longer creates Laravel's demo user. Blank email and password skip admin creation. Keep populated credentials out of Git and remove `ADMIN_PASSWORD` after the initial seed if you no longer need it.

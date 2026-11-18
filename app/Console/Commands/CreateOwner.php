@@ -54,7 +54,7 @@ class CreateOwner extends Command
         $password = $this->secret('Password', false);
         $confirmation = $this->secret('Confirm password', false);
         $credentials = Validator::make(['password' => $password, 'password_confirmation' => $confirmation], [
-            'password' => ['required', 'string', 'min:12', 'confirmed'],
+            'password' => ['required', 'string', 'confirmed'],
         ]);
 
         if ($credentials->fails()) {
