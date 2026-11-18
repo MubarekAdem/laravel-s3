@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\CoordinateStorage;
 use App\Http\Middleware\S3ErrorResponse;
+use App\Http\Middleware\SearchVisibility;
 use App\Http\Middleware\VerifyS3Signature;
 use App\Models\Bucket;
 use App\Models\MultipartUpload;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prependToGroup('web', CoordinateStorage::class);
+        $middleware->append(SearchVisibility::class);
         $middleware->preventRequestForgery(except: ['s3', 's3/*']);
         $middleware->alias(['s3.errors' => S3ErrorResponse::class, 's3.signature' => VerifyS3Signature::class]);
     })

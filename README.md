@@ -1,10 +1,10 @@
-# Harbor Storage
+# Laravel-S3
 
 Self-hosted object storage built entirely in Laravel. Store files on your own server, connect applications through a supported S3 API subset, and manage buckets, credentials, quotas, and retained files from the owner console.
 
-Harbor runs without an AWS account or a separate object-storage service. It includes a cPanel deployment workflow for PHP hosting you control.
+Laravel-S3 runs without an AWS account or a separate object-storage service. It includes a Shared hosting deployment workflow for PHP hosting you control.
 
-Files are stored on your server's disk. Storage requests go directly to Harbor; they are not forwarded to Amazon S3. Use credentials issued by Harbor. S3 compatibility means compatible API requests and signatures. The signing region (default `us-east-1`) is a compatibility value, not a hosting location or an AWS connection.
+Files are stored on your server's disk. Storage requests go directly to Laravel-S3; they are not forwarded to Amazon S3. Use credentials issued by Laravel-S3. S3 compatibility means compatible API requests and signatures. The signing region (default `us-east-1`) is a compatibility value, not a hosting location or an AWS connection.
 
 ## Features
 
@@ -14,13 +14,13 @@ Files are stored on your server's disk. Storage requests go directly to Harbor; 
 - **Recovery and maintenance:** coordinated writes and cleanup, recoverable object publication, expiring multipart uploads, checksum-verified backups, and verified restores into an empty installation.
 - **Public pages:** a product landing page and searchable API reference with copyable curl examples, OpenAPI 3.1, and plain-text AI references.
 
-Harbor implements a focused S3 subset, not the full AWS S3 service. See [Compatibility](#compatibility) before choosing client settings.
+Laravel-S3 implements a focused S3 subset, not the full AWS S3 service. See [Compatibility](#compatibility) before choosing client settings.
 
 ## Requirements
 
 - PHP **8.4** is the verified runtime; use the committed Composer lock file to check the requirements for your installation.
 - Composer and the PHP extensions required by Laravel, including PDO, Mbstring, Fileinfo, DOM/XML, OpenSSL, and cURL.
-- SQLite for local development, or MySQL/MariaDB with PDO MySQL for a typical cPanel deployment.
+- SQLite for local development, or MySQL/MariaDB with PDO MySQL for a typical Shared hosting deployment.
 - Writable private object storage, `storage/`, and `bootstrap/cache/`.
 - A scheduler cron entry for automatic retention cleanup.
 
@@ -28,7 +28,7 @@ The current public pages and console use Blade and directly served CSS. Node is 
 
 ## Local installation
 
-These commands are for a **new local installation**. For production installation or updates, use the [cPanel deployment guide](DEPLOYMENT.md).
+These commands are for a **new local installation**. For production installation or updates, use the [Shared hosting deployment guide](DEPLOYMENT.md).
 
 ```sh
 git clone https://github.com/MubarekAdem/laravel-s3.git
@@ -95,7 +95,7 @@ Auth:      AWS Signature V4
 
 API keys support `read`, `write`, `delete`, and `list` scopes, plus optional bucket restrictions. Keep secrets on a trusted backend. Browser session cookies do not authenticate storage requests.
 
-Open **`/api/docs` on your running Harbor instance** for signed curl examples, the endpoint reference, presigned URL requirements, response formats, limits, and unsupported features. The reference reflects the instance's configured region and limits.
+Open **`/api/docs` on your running Laravel-S3 instance** for signed curl examples, the endpoint reference, presigned URL requirements, response formats, limits, and unsupported features. The reference reflects the instance's configured region and limits.
 
 ## Configuration
 
@@ -122,7 +122,7 @@ php artisan object-store:purge-multipart --dry-run
 php artisan schedule:list
 ```
 
-Run Laravel's scheduler every minute. It schedules daily trash cleanup and hourly stale multipart cleanup. The [deployment guide](DEPLOYMENT.md) includes a cPanel cron example, permissions, update steps, and maintenance-mode handling.
+Run Laravel's scheduler every minute. It schedules daily trash cleanup and hourly stale multipart cleanup. The [deployment guide](DEPLOYMENT.md) includes a Shared hosting cron example, permissions, update steps, and maintenance-mode handling.
 
 ### Backups and restore
 
@@ -155,11 +155,35 @@ Pending write recovery blocks object access and mutations until reconciled. An i
 
 Supported operations include bucket creation/listing/HEAD/location/deletion; object PUT/GET/HEAD/copy/deletion; paginated object listing; multipart initiation, part upload, completion, and abort; and multi-object deletion.
 
-Harbor does not currently implement virtual-hosted buckets, IAM/bucket policies, versioning, AWS STS/session tokens, server-side encryption APIs, object tagging/locking, lifecycle APIs, ListParts/ListMultipartUploads, multipart copy, streaming chunk signatures, additional checksum APIs, delimiter/CommonPrefixes listing, or browser form POST uploads. Only the public-read upload flag is supported from the S3 ACL vocabulary. Configure clients for the supported subset described at `/api/docs`.
+Laravel-S3 does not currently implement virtual-hosted buckets, IAM/bucket policies, versioning, AWS STS/session tokens, server-side encryption APIs, object tagging/locking, lifecycle APIs, ListParts/ListMultipartUploads, multipart copy, streaming chunk signatures, additional checksum APIs, delimiter/CommonPrefixes listing, or browser form POST uploads. Only the public-read upload flag is supported from the S3 ACL vocabulary. Configure clients for the supported subset described at `/api/docs`.
 
 Storage coordination uses a shared filesystem lock on a single host. Deployments sharing storage must also share the application's persistent lock location; this is not a distributed multi-host storage cluster.
 
+## Search and AI discovery
+
+The public landing page and API docs have canonical URLs, descriptive metadata, Open Graph/social previews, and structured data. `/sitemap.xml` lists these pages; `/robots.txt` allows public crawlers and excludes console and object-storage paths. Authentication still protects private routes; robots rules are not access control. AI clients can also use `/llms.txt`, `/llms-full.txt`, and `/api/openapi.json`.
+
+For production:
+
+1. Deploy to a public domain with HTTPS and set `APP_URL=https://your-domain.example`, `APP_ENV=production`, `APP_DEBUG=false`, and `SEARCH_INDEXABLE=true`.
+2. Run `php artisan config:cache`. Redirect HTTP and alternate domain variants to the same HTTPS hostname through your host or proxy. Remove any old physical `public/robots.txt` during upgrades so Laravel can serve the generated rules.
+3. Verify domain ownership in Google Search Console and Bing Webmaster Tools, preferably using DNS. HTML verification is also supported through `GOOGLE_SITE_VERIFICATION` and `BING_SITE_VERIFICATION`; recache configuration after setting tokens.
+4. Submit `https://your-domain.example/sitemap.xml` in both tools and request indexing for the homepage and `/api/docs`.
+5. Ensure your host, CDN, or firewall permits public page access by verified search and AI search crawlers, including OAI-SearchBot. Check that no access challenge or site-wide `noindex` header blocks them. Keep authentication enabled for the console.
+6. Link your live site from the GitHub repository and relevant project profiles. Keep the public docs accurate and check crawl/index reports after deployment.
+
+Use `SEARCH_INDEXABLE=false` on staging or private installations. Discovery files make content accessible; search engines and AI providers decide whether and when to index or cite it. `llms.txt` is a supplemental reference, not an indexing guarantee.
+
 ## Development checks
+
+Run the same validation, formatting check, test suite, and dependency audit used by GitHub Actions:
+
+```sh
+composer check
+composer hooks:install
+```
+
+Install the tracked hook once after cloning. Each subsequent `git push` runs `composer check` and stops if a check fails. The hook checks the current working tree, so commit the intended changes before pushing. CI runs the same command with both SQLite and MySQL; local checks use SQLite unless a separate test database is explicitly configured. Never use a production database for tests.
 
 ```sh
 php artisan test
@@ -170,4 +194,4 @@ node tests/Browser/smoke.mjs
 
 The browser smoke check requires Node and an installed Chrome/Edge, or `BROWSER_BINARY` pointing to a Chromium browser. It uses a temporary local SQLite database and checks the landing page, API docs, login, dashboard, and bucket inventory at desktop and mobile widths.
 
-GitHub Actions is configured for SQLite and MySQL. Local verification has used SQLite; MySQL and actual cPanel-host verification must be run in their respective environments. No real AWS integration tests are required.
+GitHub Actions is configured for SQLite and MySQL. Local verification has used SQLite; MySQL and actual shared hosting verification must be run in their respective environments. No real AWS integration tests are required.

@@ -49,6 +49,14 @@
             "@php artisan config:clear --ansi @no_additional_args",
             "@php artisan test"
         ],
+        "check": [
+            "Composer\\Config::disableProcessTimeout",
+            "@composer validate --no-check-publish",
+            "@php vendor/bin/pint --test",
+            "@test",
+            "@composer audit --locked"
+        ],
+        "hooks:install": "git config core.hooksPath .github/hooks",
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"

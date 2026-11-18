@@ -13,7 +13,7 @@ class AiDocumentationTest extends TestCase
     {
         $this->get('/llms.txt')->assertOk()->assertHeader('Content-Type', 'text/plain; charset=UTF-8')
             ->assertSee(route('api.docs'), false)->assertSee(route('ai.full'), false)->assertSee(route('api.openapi'), false)->assertSee('Signature V4')
-            ->assertSee('never forwarded to Amazon S3')->assertSee('Harbor-issued credentials');
+            ->assertSee('never forwarded to Amazon S3')->assertSee('Laravel-S3-issued credentials');
     }
 
     public function test_full_text_matches_documentation_without_exposing_private_config(): void

@@ -1,3 +1,28 @@
+// Build highlighted text nodes so examples remain safe and copy verbatim.
+const syntaxPattern =
+    /(?<comment><!--[\s\S]*?-->|#[^\n]*)|(?<string>"(?:\\.|[^"\\])*"|'[^']*')|(?<tag><\/?[\w:-]+[^>]*>)|(?<variable>\$\{[^}\n]+\}|\$[A-Za-z_]\w*|\b[A-Z][A-Z0-9_]*(?==))|(?<option>--[a-z][\w-]*)|(?<command>\b(?:s3|curl|export|printf)\b)|(?<keyword>\b(?:GET|HEAD|PUT|POST|DELETE|AWS4-HMAC-SHA256|UNSIGNED-PAYLOAD|Authorization|Host)\b|x-amz-[\w-]+)|(?<number>\b\d+(?:[-.:]\d+)*\b)/g;
+document.querySelectorAll(".docs-code pre code").forEach((code) => {
+    const source = code.textContent;
+    const fragment = document.createDocumentFragment();
+    let offset = 0;
+    for (const match of source.matchAll(syntaxPattern)) {
+        fragment.append(
+            document.createTextNode(source.slice(offset, match.index)),
+        );
+        const token = document.createElement("span");
+        const kind = Object.keys(match.groups).find(
+            (name) => match.groups[name] !== undefined,
+        );
+        token.className = "code-" + kind;
+        token.textContent = match[0];
+        fragment.append(token);
+        offset = match.index + match[0].length;
+    }
+    fragment.append(document.createTextNode(source.slice(offset)));
+    code.replaceChildren(fragment);
+    code.dataset.highlighted = "true";
+});
+
 const sidebar = document.querySelector("#docs-sidebar");
 const toggle = document.querySelector("[data-docs-toggle]");
 const search = document.querySelector("#docs-search");

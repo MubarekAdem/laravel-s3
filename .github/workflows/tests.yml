@@ -1,9 +1,16 @@
-name: Local storage tests
+name: Laravel-S3 checks
 on: [push, pull_request]
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
+      fail-fast: false
       matrix:
         database: [sqlite, mysql]
     services:
@@ -11,7 +18,7 @@ jobs:
         image: mysql:8.4
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: harbor_test
+          MYSQL_DATABASE: laravel_s3_test
         ports: ['3306:3306']
         options: --health-cmd="mysqladmin ping -h localhost -proot" --health-interval=10s --health-timeout=5s --health-retries=10
     steps:
@@ -22,13 +29,11 @@ jobs:
           extensions: pdo_mysql, pdo_sqlite, mbstring, xml, curl
           coverage: none
       - run: composer install --no-interaction --prefer-dist
-      - run: vendor/bin/pint --test
-      - run: php artisan test
+      - run: composer check
         env:
           DB_CONNECTION: ${{ matrix.database }}
-          DB_DATABASE: ${{ matrix.database == 'mysql' && 'harbor_test' || ':memory:' }}
+          DB_DATABASE: ${{ matrix.database == 'mysql' && 'laravel_s3_test' || ':memory:' }}
           DB_HOST: 127.0.0.1
           DB_PORT: '3306'
           DB_USERNAME: root
           DB_PASSWORD: root
-      - run: composer audit --locked

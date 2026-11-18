@@ -1,16 +1,16 @@
-# cPanel deployment
+# Shared hosting deployment
 
 ## Hosting requirements
 
-Keep the application at `/home/CPANELUSER/object-store` and point the storage subdomain document root at `/home/CPANELUSER/object-store/public`. Replace all example usernames, domains, database names, and paths below. Keep `.env`, `vendor`, backups, and object data outside **every** public document root. Preserve `public/.htaccess` and enable Apache rewriting. If the host cannot point a domain at `public/`, request that configuration from the host before installing.
+Keep the application at `/home/HOSTUSER/object-store` and point the storage subdomain document root at `/home/HOSTUSER/object-store/public`. Replace all example usernames, domains, database names, and paths below. Keep `.env`, `vendor`, backups, and object data outside **every** public document root. Preserve `public/.htaccess` and enable Apache rewriting. If the host cannot point a domain at `public/`, request that configuration from the host before installing.
 
-Use PHP **8.4** for the domain in MultiPHP Manager and for CLI/cron. This workspace was verified with PHP 8.4.11 and Laravel 13.43.0; `composer.json` allows PHP ^8.3, but the committed lock file and extensions determine the actual hosting requirements. Check each release rather than assuming cPanel's default `php` is suitable. Laravel needs Ctype, cURL, DOM, Fileinfo, Filter, Hash, Mbstring, OpenSSL, PCRE, PDO, Session, Tokenizer, and XML; this MySQL deployment also needs `pdo_mysql`. See [Laravel deployment requirements](https://laravel.com/docs/13.x/deployment). PDO MySQL is unavailable in the local workspace: local automated tests use SQLite. No real cPanel/MySQL deployment or AWS integration was verified here; complete the host checks below before production use.
+Use PHP **8.4** for the domain in your hosting PHP settings and for CLI/cron. This workspace was verified with PHP 8.4.11 and Laravel 13.43.0; `composer.json` allows PHP ^8.3, but the committed lock file and extensions determine the actual hosting requirements. Check each release rather than assuming the host's default `php` is suitable. Laravel needs Ctype, cURL, DOM, Fileinfo, Filter, Hash, Mbstring, OpenSSL, PCRE, PDO, Session, Tokenizer, and XML; this MySQL deployment also needs `pdo_mysql`. See [Laravel deployment requirements](https://laravel.com/docs/13.x/deployment). PDO MySQL is unavailable in the local workspace: local automated tests use SQLite. No real Shared hosting/MySQL deployment or AWS integration was verified here; complete the host checks below before production use.
 
-Use Terminal/SSH as the cPanel account, not root. Select the actual host-provided PHP and Composer paths; this EasyApache PHP path is an example. Invoke Composer through the same PHP binary as Artisan:
+Use Terminal/SSH as the Shared hosting account, not root. Select the actual host-provided PHP and Composer paths; this PHP path is an example. Invoke Composer through the same PHP binary as Artisan:
 
 ```sh
-cd /home/CPANELUSER/object-store
-PHP=/opt/cpanel/ea-php84/root/usr/bin/php
+cd /home/HOSTUSER/object-store
+PHP=/usr/local/bin/php
 COMPOSER=/usr/local/bin/composer
 "$PHP" --version
 "$PHP" --ini
@@ -19,16 +19,16 @@ COMPOSER=/usr/local/bin/composer
 "$PHP" "$COMPOSER" check-platform-reqs --lock --no-dev
 ```
 
-Stop on a failed command. Never use `--ignore-platform-reqs`, `composer update`, or `composer run setup` for delivery. Install the committed `composer.lock`. Build frontend assets with `npm ci` and `npm run build` on a build machine with the Node version required by the locked Vite release, and upload `public/build` with its manifest. Exclude any development `public/hot` file from the delivery artifact. Node is not required on cPanel when compiled assets are shipped.
+Stop on a failed command. Never use `--ignore-platform-reqs`, `composer update`, or `composer run setup` for delivery. Install the committed `composer.lock`. Build frontend assets with `npm ci` and `npm run build` on a build machine with the Node version required by the locked Vite release, and upload `public/build` with its manifest. Exclude any development `public/hot` file from the delivery artifact. Node is not required on Shared hosting when compiled assets are shipped.
 
 ## First installation
 
-1. Create a MySQL database and database user in cPanel, grant that user the privileges needed for migrations, and note the full account-prefixed names. Confirm HTTPS works for the domain. Upload a release, including the lock file, compiled assets, and dotfiles. Use an empty database for a new installation.
+1. Create a MySQL database and database user in Shared hosting, grant that user the privileges needed for migrations, and note the full account-prefixed names. Confirm HTTPS works for the domain. Upload a release, including the lock file, compiled assets, and dotfiles. Use an empty database for a new installation.
 2. If this account already has application data, take and verify a backup before proceeding; use the update procedure instead. Never overwrite an existing `.env` with a template.
 3. In the application directory, copy the production template **once** and edit it privately:
 
 ```sh
-test ! -e .env && cp .env.cpanel.example .env
+test ! -e .env && cp .env.shared-hosting.example .env
 chmod 600 .env
 ```
 
@@ -37,9 +37,9 @@ Set `APP_URL` to the HTTPS domain, fill in MySQL credentials (quote passwords co
 4. Create writable private directories. The PHP process and CLI/cron must run with the account's ownership. These owner-only permissions assume that arrangement; ask the host to provide a narrow group/ACL if PHP runs as another user. Never use `777`.
 
 ```sh
-mkdir -p /home/CPANELUSER/object-store-data
+mkdir -p /home/HOSTUSER/object-store-data
 mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
-chmod 700 /home/CPANELUSER/object-store-data
+chmod 700 /home/HOSTUSER/object-store-data
 chmod -R u+rwX,go-rwx storage bootstrap/cache
 ```
 
@@ -60,10 +60,10 @@ Owner creation requires interactive hidden password entry and confirmation. A no
 
 Alternatively, create the initial owner from `.env` with `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` (nonempty; bcrypt allows at most 72 bytes). Clear configuration with `artisan config:clear`, then run `artisan db:seed --class=AdminSeeder --force --no-interaction` instead of the interactive owner-creation command. The seeder never overwrites an existing email's credentials and does not create a demo user. Leave both email and password blank to skip seeding; partial credentials fail validation. Keep the populated `.env` private, remove the bootstrap password after initial creation if no longer needed, and rebuild cached configuration afterward. Password resets continue to use the explicit interactive recovery command below.
 
-6. Add this cPanel cron as the same account, replacing both absolute paths. This runs the configured daily trash purge and hourly abandoned multipart purge. Keep cron error output available during setup; once verified, the example appends it to a private log. Arrange rotation for that log.
+6. Add this Shared hosting cron as the same account, replacing both absolute paths. This runs the configured daily trash purge and hourly abandoned multipart purge. Keep cron error output available during setup; once verified, the example appends it to a private log. Arrange rotation for that log.
 
 ```cron
-* * * * * cd /home/CPANELUSER/object-store && /opt/cpanel/ea-php84/root/usr/bin/php artisan schedule:run >> /home/CPANELUSER/object-store/storage/logs/scheduler.log 2>&1
+* * * * * cd /home/HOSTUSER/object-store && /usr/local/bin/php artisan schedule:run >> /home/HOSTUSER/object-store/storage/logs/scheduler.log 2>&1
 ```
 
 Verify `artisan schedule:list`, inspect the private scheduler log after a due run, visit `/up` and `/login` on your configured domain, and sign in. These checks require no AWS traffic. Back up the initialized `.env`/`APP_KEY` securely before issuing access credentials.
@@ -72,25 +72,25 @@ Verify `artisan schedule:list`, inspect the private scheduler log after a due ru
 
 Preserve the exact `APP_KEY` across updates. Stored access-key secrets and encrypted sessions rely on it. Regenerating it can make existing credentials unreadable. Also preserve the database, `.env`, private object root, and persistent application files. Do not run `key:generate`, `migrate:fresh`, or seeders during an update.
 
-1. Prepare the new release and compiled assets separately. Read its migration notes, verify the target PHP/extension requirements with the lock file, and record the current release identifier. Plan a window that stops writes, including cron and any independently configured workers. Disable the cPanel scheduler cron temporarily and wait for in-flight uploads and cleanup jobs to finish. Maintenance mode does not stop external workers or direct filesystem writers.
+1. Prepare the new release and compiled assets separately. Read its migration notes, verify the target PHP/extension requirements with the lock file, and record the current release identifier. Plan a window that stops writes, including cron and any independently configured workers. Disable the Shared hosting scheduler cron temporarily and wait for in-flight uploads and cleanup jobs to finish. Maintenance mode does not stop external workers or direct filesystem writers.
 2. Using the **current** release, enter maintenance mode before changing files:
 
 ```sh
-cd /home/CPANELUSER/object-store
+cd /home/HOSTUSER/object-store
 "$PHP" artisan down --retry=60 --no-interaction
 ```
 
 3. Before replacing code or migrating, make and verify a consistent backup outside all public roots and outside the object root. Use a new, private backup destination for each snapshot:
 
 ```sh
-mkdir -p /home/CPANELUSER/private-backups
-chmod 700 /home/CPANELUSER/private-backups
+mkdir -p /home/HOSTUSER/private-backups
+chmod 700 /home/HOSTUSER/private-backups
 "$PHP" artisan object-store:recover-writes --dry-run --no-interaction
-"$PHP" artisan object-store:backup /home/CPANELUSER/private-backups/pre-update-YYYYMMDD-HHMM --no-interaction
-"$PHP" artisan object-store:restore /home/CPANELUSER/private-backups/pre-update-YYYYMMDD-HHMM --verify-only --no-interaction
+"$PHP" artisan object-store:backup /home/HOSTUSER/private-backups/pre-update-YYYYMMDD-HHMM --no-interaction
+"$PHP" artisan object-store:restore /home/HOSTUSER/private-backups/pre-update-YYYYMMDD-HHMM --verify-only --no-interaction
 ```
 
-The backup parent directory must exist and the snapshot destination must be new. Resolve any pending write-recovery journals before backup; inspect the dry run and command help while writes remain paused. The backup refuses unresolved journals. Also preserve the original `.env`/`APP_KEY`, current release, persistent application files, and a host-supported MySQL database export (cPanel Backup/phpMyAdmin or your host's supported mechanism). Protect backup files and the environment copy with account-only permissions. Review the backup command's manifest/coverage and retain everything required to reconstruct a matching database and object-data snapshot, including trash and unfinished uploads. Verify the database export can be restored. Do not proceed with an unverified backup. If updating from a release without these commands, take an equivalent verified full backup through the host first.
+The backup parent directory must exist and the snapshot destination must be new. Resolve any pending write-recovery journals before backup; inspect the dry run and command help while writes remain paused. The backup refuses unresolved journals. Also preserve the original `.env`/`APP_KEY`, current release, persistent application files, and a host-supported MySQL database export (Shared hosting Backup/phpMyAdmin or your host's supported mechanism). Protect backup files and the environment copy with account-only permissions. Review the backup command's manifest/coverage and retain everything required to reconstruct a matching database and object-data snapshot, including trash and unfinished uploads. Verify the database export can be restored. Do not proceed with an unverified backup. If updating from a release without these commands, take an equivalent verified full backup through the host first.
 4. Upload/switch the prepared code while retaining `.env`, object data, persistent files, and `storage/framework/down` until verification is complete. If switching release directories, share the persistent storage directory so maintenance mode stays active. Never copy development caches or `public/hot`. Run each command below individually and stop on the first failure:
 
 ```sh
@@ -112,15 +112,15 @@ Review the write-recovery dry run before any actual recovery. Keep maintenance m
 "$PHP" artisan up --no-interaction
 ```
 
-Re-enable the cPanel cron, verify `/up`, `/login`, owner sign-in, and scheduled cleanup logging. If anything fails, leave maintenance mode active and cron disabled while fixing it. Do not automatically run `up` in a shell trap after failed migrations. A code-only rollback may be incompatible with completed migrations.
+Re-enable the Shared hosting cron, verify `/up`, `/login`, owner sign-in, and scheduled cleanup logging. If anything fails, leave maintenance mode active and cron disabled while fixing it. Do not automatically run `up` in a shell trap after failed migrations. A code-only rollback may be incompatible with completed migrations.
 
 ## Restore into an empty instance
 
 Restore into an isolated, empty destination, never over a populated live instance. Keep that destination in maintenance mode with cron/workers stopped. Use a compatible release, configure a new empty database and private empty object root, and restore the **original** `.env` key from its secure backup. Adjust destination paths and database credentials without changing `APP_KEY`. Install dependencies and run the release's migrations to prepare empty application tables; do not create an owner or issue keys before restoring. Inspect command help for release-specific prerequisites.
 
 ```sh
-"$PHP" artisan object-store:restore /home/CPANELUSER/private-backups/pre-update-YYYYMMDD-HHMM --verify-only --no-interaction
-"$PHP" artisan object-store:restore /home/CPANELUSER/private-backups/pre-update-YYYYMMDD-HHMM --force --no-interaction
+"$PHP" artisan object-store:restore /home/HOSTUSER/private-backups/pre-update-YYYYMMDD-HHMM --verify-only --no-interaction
+"$PHP" artisan object-store:restore /home/HOSTUSER/private-backups/pre-update-YYYYMMDD-HHMM --force --no-interaction
 "$PHP" artisan object-store:check --no-interaction
 "$PHP" artisan object-store:recover-writes --dry-run --no-interaction
 "$PHP" artisan optimize --no-interaction
@@ -146,7 +146,7 @@ The browser check needs an installed Chrome/Edge or the `BROWSER_BINARY` environ
 
 ## Owner recovery
 
-Restrict shell and cPanel access: any shell operator who can run this command can reset a dashboard owner. Take a backup, pause cron, drain requests, and enter maintenance mode for recovery so active requests cannot recreate revoked sessions. Keep the existing `APP_KEY`. Clear stale cached configuration if session/database settings changed, then run:
+Restrict shell and Shared hosting access: any shell operator who can run this command can reset a dashboard owner. Take a backup, pause cron, drain requests, and enter maintenance mode for recovery so active requests cannot recreate revoked sessions. Keep the existing `APP_KEY`. Clear stale cached configuration if session/database settings changed, then run:
 
 ```sh
 "$PHP" artisan object-store:owner owner@example.com --reset

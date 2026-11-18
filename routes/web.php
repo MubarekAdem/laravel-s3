@@ -3,11 +3,14 @@
 use App\Http\Controllers\ApiDocumentationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DiscoveryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\S3Controller;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'landing')->name('home');
+Route::get('/robots.txt', [DiscoveryController::class, 'robots'])->name('discovery.robots');
+Route::get('/sitemap.xml', [DiscoveryController::class, 'sitemap'])->name('discovery.sitemap');
 Route::view('/api/docs', 'api.docs')->name('api.docs');
 Route::get('/api/openapi.json', [ApiDocumentationController::class, 'openapi'])->name('api.openapi');
 Route::get('/llms.txt', [ApiDocumentationController::class, 'index'])->name('ai.index');

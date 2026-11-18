@@ -9,8 +9,8 @@ class ApiDocumentationController extends Controller
 {
     public function index(): Response
     {
-        $text = "# Harbor Storage\n\n> Self-hosted Laravel object storage with a documented S3-compatible subset.\n\n";
-        $text .= "Files are stored on this Harbor server's disk. Storage requests go directly to Harbor and are never forwarded to Amazon S3. Use Harbor-issued credentials, not AWS credentials. S3 compatibility describes the request format only.\n\nUse path-style addressing and Signature V4; browser cookies and bearer tokens do not authenticate storage requests. An AWS account is not required.\n\n## Reference\n\n";
+        $text = "# Laravel-S3\n\n> Self-hosted Laravel object storage with a documented S3-compatible subset.\n\n";
+        $text .= "Files are stored on this Laravel-S3 server's disk. Storage requests go directly to Laravel-S3 and are never forwarded to Amazon S3. Use Laravel-S3-issued credentials, not AWS credentials. S3 compatibility describes the request format only.\n\nUse path-style addressing and Signature V4; browser cookies and bearer tokens do not authenticate storage requests. An AWS account is not required.\n\n## Reference\n\n";
         $text .= '- [API documentation]('.route('api.docs')."): Human-readable setup, authentication, operations, examples, errors, and limits.\n";
         $text .= '- [Full reference]('.route('ai.full')."): Plain-text version of the same reference for AI clients.\n";
         $text .= '- [OpenAPI 3.1]('.route('api.openapi')."): Machine-readable HTTP operations, parameters, request bodies, and responses.\n\n";
@@ -33,7 +33,7 @@ class ApiDocumentationController extends Controller
         $text = preg_replace('/\n[\t ]+/', "\n", $text);
         $text = preg_replace('/\n{3,}/', "\n\n", $text);
 
-        return response('# Harbor Storage API reference'."\n\nSource: ".route('api.docs')."\nOpenAPI: ".route('api.openapi')."\n\n".trim($text)."\n", 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
+        return response('# Laravel-S3 API reference'."\n\nSource: ".route('api.docs')."\nOpenAPI: ".route('api.openapi')."\n\n".trim($text)."\n", 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
     }
 
     public function openapi(): JsonResponse
@@ -83,7 +83,7 @@ class ApiDocumentationController extends Controller
 
         return response()->json([
             'openapi' => '3.1.0',
-            'info' => ['title' => 'Harbor Storage S3 subset', 'version' => '1.0.0', 'description' => 'Self-hosted storage: files live on the Harbor server disk, and storage requests are not forwarded to Amazon S3. Use Harbor-issued credentials. S3 compatibility describes the request format only; signing region is a local compatibility value, not a hosting location. Query subresources share HTTP method/path pairs; descriptions explain dispatch. Disable unsupported SDK features. Sign the complete /s3-prefixed canonical URI. Read the linked reference for supported operations and limits.'],
+            'info' => ['title' => 'Laravel-S3 S3 subset', 'version' => '1.0.0', 'description' => 'Self-hosted storage: files live on the Laravel-S3 server disk, and storage requests are not forwarded to Amazon S3. Use Laravel-S3-issued credentials. S3 compatibility describes the request format only; signing region is a local compatibility value, not a hosting location. Query subresources share HTTP method/path pairs; descriptions explain dispatch. Disable unsupported SDK features. Sign the complete /s3-prefixed canonical URI. Read the linked reference for supported operations and limits.'],
             'servers' => [['url' => rtrim(config('app.url'), '/').'/s3']],
             'externalDocs' => ['description' => 'Full API reference', 'url' => route('api.docs')],
             'security' => [['SignatureV4' => []], ['PresignedSignature' => []]],

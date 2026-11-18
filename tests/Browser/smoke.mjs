@@ -87,6 +87,7 @@ try {
         }
     }
     await evaluate('document.querySelector("[data-docs-toggle]").click(); document.querySelector("#docs-search").value="multipart"; document.querySelector("#docs-search").dispatchEvent(new Event("input")); true');
+    if (!(await evaluate('document.querySelectorAll(".docs-code code[data-highlighted=true]").length === document.querySelectorAll(".docs-code code").length && document.querySelectorAll(".code-command").length > 0 && document.querySelectorAll(".code-string").length > 0 && document.querySelectorAll(".code-tag").length > 0'))) throw new Error('Documentation examples were not syntax highlighted');
     if (!(await evaluate('document.querySelector("#docs-search-status").textContent.includes("matching sections") && document.querySelector(".docs-nav a[href=\\\"#multipart\\\"]").hidden === false'))) throw new Error('Docs search did not return multipart section');
     await evaluate('document.querySelector("#docs-search").value=""; document.querySelector("#docs-search").dispatchEvent(new Event("input")); document.querySelector(".docs-nav a[href=\\\"#multipart\\\"]").click(); true');
     if (!(await evaluate('document.querySelector("[data-docs-toggle]").getAttribute("aria-expanded") === "false"'))) throw new Error('Docs mobile menu did not close');

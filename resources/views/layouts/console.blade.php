@@ -3,8 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#0c1d32">
-    <title>@yield('title', 'Overview') · Harbor Storage</title>
+    <title>@yield('title', 'Overview') · Laravel-S3</title>
     <link rel="stylesheet" href="{{ asset('css/harbor-console.css') }}">
     <script src="{{ asset('js/harbor-console.js') }}" defer></script>
     @stack('styles')
@@ -13,8 +14,8 @@
 <a href="#workspace" class="skip-link">Skip to workspace</a>
 <button class="sidebar-backdrop" type="button" data-nav-close aria-label="Close navigation"></button>
 <aside class="sidebar" id="console-sidebar" aria-label="Console navigation">
-    <a class="brand" href="{{ route('home') }}"><span class="brand-mark"><x-console-icon name="harbor" /></span><span>harbor<span class="brand-caption">Storage console</span></span></a>
-    <div class="workspace-label"><span class="workspace-symbol">H</span><span>Personal workspace<small>Your storage, in one place</small></span><x-console-icon name="chevron-down" /></div>
+    <a class="brand" href="{{ route('home') }}"><span class="brand-mark"><x-console-icon name="harbor" /></span><span>Laravel-S3<span class="brand-caption">Storage console</span></span></a>
+    <div class="workspace-label"><span class="workspace-symbol">L</span><span>Personal workspace<small>Your storage, in one place</small></span><x-console-icon name="chevron-down" /></div>
     <nav class="side-nav" aria-label="Workspace">
         <p class="nav-caption">Workspace</p>
         @foreach (['overview' => ['overview', 'Overview'], 'buckets' => ['bucket', 'Buckets'], 'keys' => ['key', 'Access keys'], 'activity' => ['activity', 'Activity log']] as $viewName => $navigation)
@@ -39,7 +40,7 @@
         @if (session('status'))<div class="alert alert-success" role="status"><x-console-icon name="check" /><span>{{ session('status') }}</span></div>@endif
         @if ($errors->any())<div class="alert alert-error" role="alert"><x-console-icon name="info" /><div><strong>We couldn’t save those changes.</strong><ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div></div>@endif
         @yield('content')
-        <footer class="workspace-footer"><span>Harbor Storage</span><a href="{{ route('api.docs') }}">Build something with your storage <x-console-icon name="external" /></a></footer>
+        <footer class="workspace-footer"><span>Laravel-S3</span><a href="{{ route('api.docs') }}">Build something with your storage <x-console-icon name="external" /></a></footer>
     </main>
 </div>
 <div class="toast" role="status" aria-live="polite" data-toast hidden></div>

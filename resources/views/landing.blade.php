@@ -1,25 +1,25 @@
 @extends('layouts.public')
 
-@section('title', 'Harbor Storage — Object storage on your own shore')
+@section('title', 'Laravel-S3 — Object storage on your own server')
 
 @section('content')
     <section class="harbor-hero harbor-container" aria-labelledby="hero-title">
         <div class="harbor-hero-copy">
             <p class="harbor-kicker"><span aria-hidden="true"></span> Your server. Your storage.</p>
             <h1 id="hero-title">Give your files<br>a home port.</h1>
-            <p class="harbor-lead">Practical object storage for the apps you build. Run Harbor on your own Laravel hosting and connect through a familiar S3 API.</p>
+            <p class="harbor-lead">Practical object storage for the apps you build. Run Laravel-S3 on your own Laravel hosting and connect through a familiar S3 API.</p>
             <div class="harbor-actions">
                 <a class="harbor-button" href="{{ route('api.docs') }}">Explore the API <span aria-hidden="true">↗</span></a>
                 <a class="harbor-button harbor-button-secondary" href="{{ auth()->check() ? route('dashboard') : route('login') }}">Open owner console</a>
             </div>
-            <p class="harbor-hero-note">Pure Laravel. Path-style requests. cPanel-friendly.</p>
+            <p class="harbor-hero-note">Pure Laravel. Path-style requests. Shared hosting friendly.</p>
         </div>
 
         <figure class="harbor-object-map">
-            <div class="harbor-map-heading"><span>Inside your harbor</span><span class="harbor-map-label">Object structure</span></div>
+            <div class="harbor-map-heading"><span>Your storage</span><span class="harbor-map-label">Object structure</span></div>
             <svg class="harbor-map-svg" viewBox="0 0 460 325" role="img" aria-labelledby="object-map-title object-map-description">
                 <title id="object-map-title">From your application to a bucket and its objects</title>
-                <desc id="object-map-description">Your application connects to Harbor Storage. An example bucket called project-assets contains images, documents, and backups.</desc>
+                <desc id="object-map-description">Your application connects to Laravel-S3. An example bucket called project-assets contains images, documents, and backups.</desc>
                 <defs>
                     <pattern id="harbor-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#254057" stroke-width=".6"/></pattern>
                 </defs>
@@ -66,11 +66,11 @@
                 <article>
                     <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M5 5h22v9H5zm0 13h22v9H5zM9 9h2m-2 13h2m5-13h7m-7 13h7" stroke="currentColor" stroke-width="1.6"/></svg>
                     <h3>Keep your hosting familiar</h3>
-                    <p>A pure Laravel application with a cPanel deployment path. Your host’s storage, upload limits, and PHP configuration set the boundaries.</p>
+                    <p>A pure Laravel application with a shared hosting deployment path. Your host’s storage, upload limits, and PHP configuration set the boundaries.</p>
                 </article>
             </div>
             <aside class="harbor-compatibility" aria-labelledby="compatibility-title">
-                <div><h3 id="compatibility-title">A focused S3 subset. Clear boundaries.</h3><p>Harbor supports a subset of the S3 API, not the complete AWS S3 service. Confirm the operations your application needs in the compatibility reference.</p></div>
+                <div><h3 id="compatibility-title">A focused S3 subset. Clear boundaries.</h3><p>Laravel-S3 supports a subset of the S3 API, not the complete AWS S3 service. Confirm the operations your application needs in the compatibility reference.</p></div>
                 <a class="harbor-text-link" href="{{ route('api.docs') }}">Read the API docs <span aria-hidden="true">↗</span></a>
             </aside>
         </div>

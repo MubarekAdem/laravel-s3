@@ -1,7 +1,7 @@
 @props(['name' => 'file'])
 @php
     $paths = [
-        'harbor' => 'M4 6 12 2l8 4v12l-8 4-8-4V6Zm4 1v10m8-10v10M8 12h8',
+        'harbor' => 'M4 6 12 2l8 4v12l-8 4-8-4V6Zm5 1v10h7',
         'overview' => 'M3 3h7v7H3V3Zm11 0h7v7h-7V3ZM3 14h7v7H3v-7Zm11 0h7v7h-7v-7Z',
         'bucket' => 'M3 7c0-2 4-4 9-4s9 2 9 4-4 4-9 4-9-2-9-4Zm0 0v10c0 2 4 4 9 4s9-2 9-4V7M3 12c0 2 4 4 9 4s9-2 9-4',
         'key' => 'M15 3a6 6 0 1 1-4 10L3 21H1v-4l8-8a6 6 0 0 1 6-6Zm2 4h.01M5 15l4 4',

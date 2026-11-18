@@ -1,14 +1,14 @@
 @extends('layouts.docs')
-@section('title', 'API documentation · Harbor Storage')
+@section('title', 'API documentation · Laravel-S3')
 @section('content')
     <article class="docs-main">
         <section id="overview">
             <span class="docs-version">Storage API reference</span>
             <h1>API documentation</h1>
             <p class="docs-intro">Use signed HTTP requests to store files on this server. The API uses S3-style paths, Signature V4 authentication, raw upload bodies, and XML control responses.</p>
-            <div class="docs-notice"><strong>Your Harbor API endpoint</strong><br><code>{{ rtrim(config('app.url'), '/') }}/s3</code><br>Object URL format: <code>/s3/{bucket}/{key}</code>. All storage requests go to this server.</div>
-            <p>Harbor stores files on your own server's disk. S3 compatibility describes the request format only; Harbor does not forward storage traffic to Amazon S3 or require AWS credentials.</p>
-            <p>This is the reference for Harbor's implemented S3 subset. It is not a JSON REST API and does not require an AWS account. Browser session cookies and bearer tokens do not authenticate storage requests.</p>
+            <div class="docs-notice"><strong>Your Laravel-S3 API endpoint</strong><br><code>{{ rtrim(config('app.url'), '/') }}/s3</code><br>Object URL format: <code>/s3/{bucket}/{key}</code>. All storage requests go to this server.</div>
+            <p>Laravel-S3 stores files on your own server's disk. S3 compatibility describes the request format only; Laravel-S3 does not forward storage traffic to Amazon S3 or require AWS credentials.</p>
+            <p>This is the reference for Laravel-S3's implemented S3 subset. It is not a JSON REST API and does not require an AWS account. Browser session cookies and bearer tokens do not authenticate storage requests.</p>
         </section>
 
         <section id="quickstart">
@@ -30,24 +30,24 @@ s3() {
     --user "${ACCESS_KEY}:${SECRET_KEY}" "$@"
 }
 
-printf 'Hello from Harbor\n' &gt; hello.txt
+printf 'Hello from Laravel-S3\n' &gt; hello.txt
 s3 --request PUT --data-binary @hello.txt \
   --header 'Content-Type: text/plain' \
   "$ENDPOINT/media/hello.txt"
 
 s3 "$ENDPOINT/media/hello.txt" --output downloaded.txt
 s3 "$ENDPOINT/media?list-type=2&amp;prefix=hello&amp;max-keys=50"</code></pre></div>
-            <p>The remaining curl examples use this <code>s3</code> helper. All commands target the configured Harbor endpoint; they do not contact AWS. Upload and copy return an <code>ETag</code> response header.</p>
+            <p>The remaining curl examples use this <code>s3</code> helper. All commands target the configured Laravel-S3 endpoint; they do not contact AWS. Upload and copy return an <code>ETag</code> response header.</p>
         </section>
 
         <section id="authentication">
             <h2>Authentication &amp; permissions</h2>
-            <p>Sign requests using <code>AWS4-HMAC-SHA256</code>, service <code>s3</code>, and signing region <code>{{ config('object-store.region') }}</code>. This region is a compatibility value used to calculate signatures locally, not a storage location or an AWS connection. Use the access key and secret created in Harbor. A client library can generate the signature. Keep the endpoint's <code>/s3</code> prefix in the canonical URI.</p>
+            <p>Sign requests using <code>AWS4-HMAC-SHA256</code>, service <code>s3</code>, and signing region <code>{{ config('object-store.region') }}</code>. This region is a compatibility value used to calculate signatures locally, not a storage location or an AWS connection. Use the access key and secret created in Laravel-S3. A client library can generate the signature. Keep the endpoint's <code>/s3</code> prefix in the canonical URI.</p>
             <div class="docs-code"><button type="button" data-copy>Copy</button><pre><code>Authorization: AWS4-HMAC-SHA256 Credential=ACCESS_KEY/YYYYMMDD/REGION/s3/aws4_request, SignedHeaders=host;x-amz-date, Signature=64_HEX_CHARACTERS
 x-amz-date: YYYYMMDDTHHMMSSZ
 Host: your-storage-host</code></pre></div>
             <p>This is the header shape, not a usable signature. Signed header names must be lowercase, unique, and sorted. Include <code>host</code> (including a non-default port), and sign every supplied <code>x-amz-*</code> header except <code>x-amz-content-sha256</code>, which is represented in the canonical payload hash. Header-authenticated requests must be within 15 minutes of the server clock. Synchronize the client clock.</p>
-            <p>The payload can use its SHA-256 digest or <code>UNSIGNED-PAYLOAD</code>. If a digest is supplied, Harbor verifies the received body against it. URL-encode key segments and query values, preserve slash separators in object keys, and include bare subresources such as <code>uploads=</code> when signing.</p>
+            <p>The payload can use its SHA-256 digest or <code>UNSIGNED-PAYLOAD</code>. If a digest is supplied, Laravel-S3 verifies the received body against it. URL-encode key segments and query values, preserve slash separators in object keys, and include bare subresources such as <code>uploads=</code> when signing.</p>
             <div class="docs-table"><table><thead><tr><th>Scope</th><th>Allows</th></tr></thead><tbody>
                 <tr><td><code>read</code></td><td>Object GET/HEAD, bucket HEAD/location, and reading a copy source.</td></tr>
                 <tr><td><code>list</code></td><td>Listing buckets and objects.</td></tr>

@@ -7,9 +7,9 @@ use Tests\TestCase;
 
 class DeploymentEnvironmentTest extends TestCase
 {
-    public function test_cpanel_template_has_safe_production_defaults_without_embedded_secrets(): void
+    public function test_shared_hosting_template_has_safe_production_defaults_without_embedded_secrets(): void
     {
-        $environment = Dotenv::parse(file_get_contents(base_path('.env.cpanel.example')));
+        $environment = Dotenv::parse(file_get_contents(base_path('.env.shared-hosting.example')));
 
         $this->assertSame('production', $environment['APP_ENV']);
         $this->assertSame('false', $environment['APP_DEBUG']);
@@ -25,14 +25,14 @@ class DeploymentEnvironmentTest extends TestCase
         $this->assertSame('null', $environment['SESSION_DOMAIN']);
         $this->assertSame('sync', $environment['QUEUE_CONNECTION']);
         $this->assertSame('local', $environment['FILESYSTEM_DISK']);
-        $this->assertSame('/home/CPANELUSER/object-store-data', $environment['OBJECT_STORE_PATH']);
+        $this->assertSame('/home/HOSTUSER/object-store-data', $environment['OBJECT_STORE_PATH']);
         $this->assertArrayNotHasKey('AWS_ACCESS_KEY_ID', $environment);
         $this->assertArrayNotHasKey('AWS_SECRET_ACCESS_KEY', $environment);
     }
 
     public function test_environment_templates_expose_valid_local_storage_limits(): void
     {
-        foreach (['.env.example', '.env.cpanel.example'] as $template) {
+        foreach (['.env.example', '.env.shared-hosting.example'] as $template) {
             $environment = Dotenv::parse(file_get_contents(base_path($template)));
 
             $this->assertNotEmpty($environment['OBJECT_STORE_REGION'], $template);

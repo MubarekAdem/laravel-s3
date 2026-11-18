@@ -1,3 +1,28 @@
+.docs-code .code-comment {
+    color: #97adc4;
+    font-style: italic;
+}
+.docs-code .code-string {
+    color: #f4ce8a;
+}
+.docs-code .code-tag {
+    color: #78ddd3;
+}
+.docs-code .code-variable {
+    color: #8ae0ee;
+}
+.docs-code .code-option {
+    color: #99c5ff;
+}
+.docs-code .code-command {
+    color: #9fe3b6;
+}
+.docs-code .code-keyword {
+    color: #cbb6ff;
+}
+.docs-code .code-number {
+    color: #f1ad91;
+}
 :root {
     font-family: "Segoe UI", Helvetica, Arial, sans-serif;
     color: #26394b;

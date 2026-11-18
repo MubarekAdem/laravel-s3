@@ -3,23 +3,24 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#091827">
-    <title>Sign in · Harbor Storage</title>
+    <title>Sign in · Laravel-S3</title>
     <link rel="stylesheet" href="{{ asset('css/harbor-auth.css') }}">
 </head>
 <body class="harbor-auth">
     <a class="auth-skip" href="#sign-in">Skip to sign in</a>
-    <aside class="auth-brand-panel" aria-label="Harbor Storage">
-        <a class="auth-brand" href="{{ route('home') }}" aria-label="Harbor Storage home">
+    <aside class="auth-brand-panel" aria-label="Laravel-S3">
+        <a class="auth-brand" href="{{ route('home') }}" aria-label="Laravel-S3 home">
             <svg viewBox="0 0 32 36" width="30" height="34" fill="none" aria-hidden="true">
                 <path d="M4 7v20l12 6 12-6V7L16 1 4 7Z" stroke="currentColor" stroke-width="2"/>
-                <path d="M10 11v14m12-14v14M10 18h12" stroke="currentColor" stroke-width="3"/>
+                <path d="M11 10v15h11" stroke="currentColor" stroke-width="3"/>
             </svg>
-            <span>Harbor <span class="auth-brand-detail">Storage</span></span>
+            <span>Laravel-S3</span>
         </a>
         <div class="auth-story">
             <h2>A home for<br>what you build.</h2>
-            <p>Object storage on your own infrastructure.<br class="auth-desktop-break"> Your buckets, your keys, your Harbor.</p>
+            <p>Object storage on your own infrastructure.<br class="auth-desktop-break"> Your buckets, your keys, your server.</p>
             <svg class="auth-warehouse" viewBox="0 0 560 340" fill="none" aria-hidden="true">
                 <defs>
                     <pattern id="warehouse-slats" width="12" height="12" patternUnits="userSpaceOnUse">
@@ -90,7 +91,7 @@
                 <p class="auth-owner-note">Use the owner account configured for this server.</p>
             </section>
             <nav class="auth-links" aria-label="Useful links">
-                <a href="{{ route('home') }}">Harbor home</a>
+                <a href="{{ route('home') }}">Laravel-S3 home</a>
                 <a href="{{ route('api.docs') }}">API documentation</a>
             </nav>
         </div>
