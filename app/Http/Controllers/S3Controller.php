@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
 use App\Models\Bucket;
+use App\Models\MultipartUpload;
 use App\Models\ObjectRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 class S3Controller extends Controller
 {
@@ -81,6 +83,10 @@ class S3Controller extends Controller
 
     public function put(Request $r, string $bucket, string $key)
     {
+        if ($r->filled('uploadId')) {
+            return $this->uploadPart($r, $bucket, $key);
+        }
+
         $b = $this->bucket($bucket);
         $p = $this->path($b, $key);
         File::ensureDirectoryExists(dirname($p));
@@ -132,11 +138,87 @@ class S3Controller extends Controller
 
     public function delete(Request $r, string $bucket, string $key)
     {
+        if ($r->filled('uploadId')) {
+            return $this->abortMultipart($r, $bucket, $key);
+        }
+
         $o = $this->bucket($bucket)->objects()->where('key', $key)->whereNull('deleted_at')->firstOrFail();
         $o->update(['deleted_at' => now()]);
         $this->audit($r, 'object.delete', $bucket, $key);
 
         return response('', 204);
+    }
+
+    public function post(Request $request, string $bucket, string $key)
+    {
+        return $request->has('uploads') ? $this->initiateMultipart($request, $bucket, $key) : $this->completeMultipart($request, $bucket, $key);
+    }
+
+    private function initiateMultipart(Request $request, string $bucket, string $key)
+    {
+        $bucketModel = $this->bucket($bucket);
+        $upload = $bucketModel->multipartUploads()->create(['key' => $key, 'upload_id' => (string) Str::uuid(), 'content_type' => $request->header('Content-Type'), 'metadata' => [], 'is_public' => $request->header('x-amz-acl') === 'public-read']);
+        $this->audit($request, 'multipart.initiate', $bucket, $key);
+
+        return response("<?xml version=\"1.0\" encoding=\"UTF-8\"?><InitiateMultipartUploadResult><Bucket>{$bucket}</Bucket><Key>{$key}</Key><UploadId>{$upload->upload_id}</UploadId></InitiateMultipartUploadResult>", 200, ['Content-Type' => 'application/xml']);
+    }
+
+    private function uploadPart(Request $request, string $bucket, string $key)
+    {
+        $upload = $this->multipartUpload($bucket, $key, $request->string('uploadId')->toString());
+        $partNumber = $request->integer('partNumber');
+        abort_unless($partNumber >= 1 && $partNumber <= 10000, 400, 'Invalid part number.');
+        $body = $request->getContent();
+        $path = config('object-store.root').DIRECTORY_SEPARATOR.'multipart'.DIRECTORY_SEPARATOR.$upload->upload_id.DIRECTORY_SEPARATOR.$partNumber;
+        File::ensureDirectoryExists(dirname($path));
+        File::put($path, $body);
+        $part = $upload->parts()->updateOrCreate(['part_number' => $partNumber], ['path' => $path, 'size' => strlen($body), 'etag' => md5($body)]);
+        $this->audit($request, 'multipart.part.put', $bucket, $key);
+
+        return response('', 200, ['ETag' => '"'.$part->etag.'"']);
+    }
+
+    private function completeMultipart(Request $request, string $bucket, string $key)
+    {
+        $upload = $this->multipartUpload($bucket, $key, $request->string('uploadId')->toString());
+        $parts = $upload->parts()->orderBy('part_number')->get();
+        abort_if($parts->isEmpty(), 400, 'Multipart upload has no parts.');
+        $size = $parts->sum('size');
+        $bucketModel = $this->bucket($bucket);
+        $this->ensureWithinQuota($bucketModel, $key, $size);
+        $path = $this->path($bucketModel, $key);
+        File::ensureDirectoryExists(dirname($path));
+        File::put($path, '');
+        foreach ($parts as $part) {
+            File::append($path, File::get($part->path));
+        }
+        $etag = md5_file($path);
+        $bucketModel->objects()->updateOrCreate(['key' => $key], ['path' => $path, 'size' => $size, 'etag' => $etag, 'content_type' => $upload->content_type, 'metadata' => $upload->metadata, 'is_public' => $upload->is_public, 'deleted_at' => null]);
+        $this->removeMultipartFiles($upload);
+        $upload->delete();
+        $this->audit($request, 'multipart.complete', $bucket, $key);
+
+        return response("<?xml version=\"1.0\" encoding=\"UTF-8\"?><CompleteMultipartUploadResult><Bucket>{$bucket}</Bucket><Key>{$key}</Key><ETag>\"{$etag}\"</ETag></CompleteMultipartUploadResult>", 200, ['Content-Type' => 'application/xml']);
+    }
+
+    private function abortMultipart(Request $request, string $bucket, string $key)
+    {
+        $upload = $this->multipartUpload($bucket, $key, $request->string('uploadId')->toString());
+        $this->removeMultipartFiles($upload);
+        $upload->delete();
+        $this->audit($request, 'multipart.abort', $bucket, $key);
+
+        return response('', 204);
+    }
+
+    private function multipartUpload(string $bucket, string $key, string $uploadId): MultipartUpload
+    {
+        return $this->bucket($bucket)->multipartUploads()->where('key', $key)->where('upload_id', $uploadId)->firstOrFail();
+    }
+
+    private function removeMultipartFiles(MultipartUpload $upload): void
+    {
+        File::deleteDirectory(config('object-store.root').DIRECTORY_SEPARATOR.'multipart'.DIRECTORY_SEPARATOR.$upload->upload_id);
     }
 
     private function copySource(Request $request): ?ObjectRecord
