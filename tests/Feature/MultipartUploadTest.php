@@ -29,5 +29,6 @@ class MultipartUploadTest extends TestCase
         $this->assertDatabaseMissing('multipart_uploads', ['upload_id' => $uploadId]);
         $this->assertDatabaseHas('objects', ['key' => 'video.bin', 'size' => 11]);
         $this->assertSame('hello world', File::get(config('object-store.root').DIRECTORY_SEPARATOR.'1'.DIRECTORY_SEPARATOR.hash('sha256', 'video.bin')));
+        File::deleteDirectory(config('object-store.root'));
     }
 }
