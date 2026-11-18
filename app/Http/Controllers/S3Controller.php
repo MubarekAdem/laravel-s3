@@ -62,14 +62,20 @@ class S3Controller extends Controller
         $source = $this->copySource($r);
 
         if ($source) {
-            File::copy($source->path, $p);
             $attributes = ['path' => $p, 'size' => $source->size, 'etag' => $source->etag, 'content_type' => $source->content_type, 'metadata' => $source->metadata, 'is_public' => $source->is_public, 'deleted_at' => null];
             $action = 'object.copy';
         } else {
             $body = $r->getContent();
-            File::put($p, $body);
             $attributes = ['path' => $p, 'size' => strlen($body), 'etag' => md5($body), 'content_type' => $r->header('Content-Type'), 'metadata' => collect($r->headers->all())->filter(fn ($v, $k) => str_starts_with($k, 'x-amz-meta-'))->map(fn ($v) => $v[0])->all(), 'is_public' => $r->header('x-amz-acl') === 'public-read', 'deleted_at' => null];
             $action = 'object.put';
+        }
+
+        $this->ensureWithinQuota($b, $key, $attributes['size']);
+
+        if ($source) {
+            File::copy($source->path, $p);
+        } else {
+            File::put($p, $body);
         }
 
         $o = $b->objects()->updateOrCreate(['key' => $key], $attributes);
@@ -108,5 +114,19 @@ class S3Controller extends Controller
         [$bucket, $key] = explode('/', ltrim(urldecode($copySource), '/'), 2);
 
         return $this->bucket($bucket)->objects()->where('key', $key)->whereNull('deleted_at')->firstOrFail();
+    }
+
+    private function ensureWithinQuota(Bucket $bucket, string $key, int $incomingSize): void
+    {
+        if ($bucket->quota_bytes === null) {
+            return;
+        }
+
+        $existingSize = $bucket->objects()->where('key', $key)->whereNull('deleted_at')->value('size') ?? 0;
+        $usedBytes = $bucket->objects()->whereNull('deleted_at')->sum('size');
+
+        if (($usedBytes - $existingSize + $incomingSize) > $bucket->quota_bytes) {
+            abort(413, 'Bucket quota would be exceeded.');
+        }
     }
 }
