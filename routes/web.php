@@ -11,6 +11,7 @@ Route::middleware('guest')->group(function () {
 });
 Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index']);
+    Route::post('/buckets', [DashboardController::class, 'storeBucket']);
     Route::post('/keys', [DashboardController::class, 'key']);
     Route::delete('/keys/{key}', [DashboardController::class, 'revoke']);
     Route::post('/logout', [AuthController::class, 'destroy']);

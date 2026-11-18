@@ -14,7 +14,35 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        return view('dashboard', ['buckets' => Bucket::count(), 'objects' => ObjectRecord::whereNull('deleted_at')->count(), 'bytes' => (int) ObjectRecord::whereNull('deleted_at')->sum('size'), 'keys' => AccessKey::whereNull('revoked_at')->latest()->get(), 'events' => AuditEvent::latest()->limit(8)->get()]);
+        $bucketRows = Bucket::query()
+            ->withCount(['objects as active_objects_count' => fn ($query) => $query->whereNull('deleted_at')])
+            ->withSum(['objects as active_bytes' => fn ($query) => $query->whereNull('deleted_at')], 'size')
+            ->orderBy('name')
+            ->get();
+
+        return view('dashboard', [
+            'buckets' => $bucketRows->count(),
+            'bucketRows' => $bucketRows,
+            'objects' => ObjectRecord::whereNull('deleted_at')->count(),
+            'bytes' => (int) ObjectRecord::whereNull('deleted_at')->sum('size'),
+            'keys' => AccessKey::whereNull('revoked_at')->latest()->get(),
+            'events' => AuditEvent::latest()->limit(8)->get(),
+        ]);
+    }
+
+    public function storeBucket(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'min:3', 'max:63', 'regex:/\A[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\z/', 'unique:buckets,name'],
+            'quota_mb' => ['nullable', 'integer', 'min:1', 'max:1048576'],
+        ]);
+
+        Bucket::create([
+            'name' => $data['name'],
+            'quota_bytes' => isset($data['quota_mb']) ? $data['quota_mb'] * 1024 * 1024 : null,
+        ]);
+
+        return back()->with('status', 'Bucket created.');
     }
 
     public function key(Request $r)
