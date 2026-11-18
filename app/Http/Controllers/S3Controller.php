@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditEvent;
 use App\Models\Bucket;
+use App\Models\MultipartPart;
 use App\Models\MultipartUpload;
 use App\Models\ObjectRecord;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
@@ -41,6 +43,13 @@ class S3Controller extends Controller
     {
         Bucket::firstOrCreate(['name' => $bucket]);
         $this->audit($r, 'bucket.create', $bucket);
+
+        return response('', 200);
+    }
+
+    public function headBucket(string $bucket)
+    {
+        $this->bucket($bucket);
 
         return response('', 200);
     }
@@ -91,42 +100,67 @@ class S3Controller extends Controller
         $p = $this->path($b, $key);
         File::ensureDirectoryExists(dirname($p));
         $source = $this->copySource($r);
+        $temporaryUpload = null;
 
         if ($source) {
             $attributes = ['path' => $p, 'size' => $source->size, 'etag' => $source->etag, 'content_type' => $source->content_type, 'metadata' => $source->metadata, 'is_public' => $source->is_public, 'deleted_at' => null];
             $action = 'object.copy';
         } else {
-            $body = $r->getContent();
-            if (strlen($body) > config('object-store.max_bytes')) {
-                abort(413, 'Object exceeds configured size.');
-            }
-
-            $attributes = ['path' => $p, 'size' => strlen($body), 'etag' => md5($body), 'content_type' => $r->header('Content-Type'), 'metadata' => collect($r->headers->all())->filter(fn ($v, $k) => str_starts_with($k, 'x-amz-meta-'))->map(fn ($v) => $v[0])->all(), 'is_public' => $r->header('x-amz-acl') === 'public-read', 'deleted_at' => null];
+            $temporaryUpload = $this->streamRequestToTemporaryPath($r, $p);
+            $attributes = ['path' => $p, 'size' => $temporaryUpload['size'], 'etag' => $temporaryUpload['etag'], 'content_type' => $r->header('Content-Type'), 'metadata' => collect($r->headers->all())->filter(fn ($v, $k) => str_starts_with($k, 'x-amz-meta-'))->map(fn ($v) => $v[0])->all(), 'is_public' => $r->header('x-amz-acl') === 'public-read', 'deleted_at' => null];
             $action = 'object.put';
         }
 
-        $this->ensureWithinQuota($b, $key, $attributes['size']);
+        try {
+            $o = DB::transaction(function () use ($b, $key, $attributes, $source, $p, $temporaryUpload) {
+                $bucketModel = Bucket::query()->lockForUpdate()->findOrFail($b->id);
+                $this->ensureWithinQuota($bucketModel, $key, $attributes['size']);
+                File::copy($source ? $source->path : $temporaryUpload['path'], $p);
 
-        if ($source) {
-            File::copy($source->path, $p);
-        } else {
-            File::put($p, $body);
+                return $bucketModel->objects()->updateOrCreate(['key' => $key], $attributes);
+            });
+        } finally {
+            if ($temporaryUpload !== null) {
+                File::delete($temporaryUpload['path']);
+            }
         }
-
-        $o = $b->objects()->updateOrCreate(['key' => $key], $attributes);
         $this->audit($r, $action, $bucket, $key);
 
         return response('', 200, ['ETag' => '"'.$o->etag.'"']);
     }
 
-    public function get(string $bucket, string $key)
+    public function get(Request $request, string $bucket, string $key)
     {
         $o = $this->bucket($bucket)->objects()->where('key', $key)->whereNull('deleted_at')->firstOrFail();
         if (! File::exists($o->path)) {
             abort(404);
         }
 
-        return response()->file($o->path, ['Content-Type' => $o->content_type ?: 'application/octet-stream', 'ETag' => '"'.$o->etag.'"']);
+        $start = 0;
+        $end = $o->size - 1;
+        $status = 200;
+        if ($request->header('Range')) {
+            [$start, $end] = $this->range($request->header('Range'), $o->size);
+            $status = 206;
+        }
+
+        $length = $end - $start + 1;
+        $headers = ['Content-Type' => $o->content_type ?: 'application/octet-stream', 'Content-Length' => $length, 'ETag' => '"'.$o->etag.'"', 'Accept-Ranges' => 'bytes'];
+        if ($status === 206) {
+            $headers['Content-Range'] = "bytes {$start}-{$end}/{$o->size}";
+        }
+
+        return response()->stream(function () use ($o, $start, $length): void {
+            $stream = fopen($o->path, 'rb');
+            fseek($stream, $start);
+            $remaining = $length;
+            while ($remaining > 0 && ! feof($stream)) {
+                $chunk = fread($stream, min(1024 * 1024, $remaining));
+                $remaining -= strlen($chunk);
+                echo $chunk;
+            }
+            fclose($stream);
+        }, $status, $headers);
     }
 
     public function head(string $bucket, string $key)
@@ -226,15 +260,21 @@ class S3Controller extends Controller
         $upload = $this->multipartUpload($bucket, $key, $request->string('uploadId')->toString());
         $parts = $upload->parts()->orderBy('part_number')->get();
         abort_if($parts->isEmpty(), 400, 'Multipart upload has no parts.');
+        $requestedParts = $this->completedParts($request->getContent());
+        $storedParts = $parts->map(fn (MultipartPart $part) => ['number' => (int) $part->part_number, 'etag' => $part->etag])->all();
+        abort_if($requestedParts !== $storedParts, 400, 'Multipart completion parts do not match uploaded parts.');
         $size = $parts->sum('size');
         $bucketModel = $this->bucket($bucket);
         $this->ensureWithinQuota($bucketModel, $key, $size);
         $path = $this->path($bucketModel, $key);
         File::ensureDirectoryExists(dirname($path));
-        File::put($path, '');
+        $destination = fopen($path, 'wb');
         foreach ($parts as $part) {
-            File::append($path, File::get($part->path));
+            $source = fopen($part->path, 'rb');
+            stream_copy_to_stream($source, $destination);
+            fclose($source);
         }
+        fclose($destination);
         $etag = md5_file($path);
         $bucketModel->objects()->updateOrCreate(['key' => $key], ['path' => $path, 'size' => $size, 'etag' => $etag, 'content_type' => $upload->content_type, 'metadata' => $upload->metadata, 'is_public' => $upload->is_public, 'deleted_at' => null]);
         $this->removeMultipartFiles($upload);
@@ -289,5 +329,55 @@ class S3Controller extends Controller
         if (($usedBytes - $existingSize + $incomingSize) > $bucket->quota_bytes) {
             abort(413, 'Bucket quota would be exceeded.');
         }
+    }
+
+    private function range(string $header, int $size): array
+    {
+        abort_unless(preg_match('/^bytes=(\d*)-(\d*)$/', $header, $matches), 416, 'Invalid byte range.');
+        $start = $matches[1] === '' ? max($size - (int) $matches[2], 0) : (int) $matches[1];
+        $end = $matches[2] === '' || $matches[1] === '' ? $size - 1 : min((int) $matches[2], $size - 1);
+        abort_if($size === 0 || $start > $end || $start >= $size, 416, 'Requested range is not satisfiable.');
+
+        return [$start, $end];
+    }
+
+    private function completedParts(string $body): array
+    {
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($body, \SimpleXMLElement::class, LIBXML_NONET | LIBXML_NOCDATA);
+        libxml_clear_errors();
+        abort_if($xml === false || $xml->getName() !== 'CompleteMultipartUpload', 400, 'Malformed multipart completion request.');
+
+        $parts = [];
+        foreach ($xml->Part as $part) {
+            $parts[] = ['number' => (int) $part->PartNumber, 'etag' => trim((string) $part->ETag, '"')];
+        }
+
+        return $parts;
+    }
+
+    private function streamRequestToTemporaryPath(Request $request, string $path): array
+    {
+        $temporaryPath = $path.'.'.Str::uuid().'.upload';
+        File::ensureDirectoryExists(dirname($temporaryPath));
+        $input = $request->getContent(true);
+        $output = fopen($temporaryPath, 'wb');
+        $hash = hash_init('md5');
+        $size = 0;
+
+        while (! feof($input)) {
+            $chunk = fread($input, 1024 * 1024);
+            $size += strlen($chunk);
+            if ($size > config('object-store.max_bytes')) {
+                fclose($output);
+                File::delete($temporaryPath);
+                abort(413, 'Object exceeds configured size.');
+            }
+            fwrite($output, $chunk);
+            hash_update($hash, $chunk);
+        }
+        fclose($output);
+
+        return ['path' => $temporaryPath, 'size' => $size, 'etag' => hash_final($hash)];
     }
 }

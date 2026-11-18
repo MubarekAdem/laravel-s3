@@ -64,7 +64,7 @@
 
         <section class="card">
             <h2>Recent activity</h2>
-            <table>
+            <form method="get" class="scope-list"><input name="activity_bucket" value="{{ $activityFilters['activity_bucket'] ?? '' }}" placeholder="Bucket"><input name="activity_action" value="{{ $activityFilters['activity_action'] ?? '' }}" placeholder="Action"><button>Filter activity</button></form><table>
                 @forelse ($events as $event)
                     <tr><td>{{ $event->action }}</td><td>{{ $event->bucket }}</td><td class="muted right">{{ $event->created_at->diffForHumans() }}</td></tr>
                 @empty
@@ -80,7 +80,7 @@
             <thead><tr><th>Name</th><th class="right">Objects</th><th class="right">Stored</th><th class="right">Quota</th><th></th></tr></thead>
             <tbody>
             @forelse ($bucketRows as $bucket)
-                <tr><td><code>{{ $bucket->name }}</code></td><td class="right">{{ number_format($bucket->active_objects_count) }}</td><td class="right">{{ number_format($bucket->active_bytes ?? 0) }} B</td><td class="right">{{ $bucket->quota_bytes ? number_format($bucket->quota_bytes) . ' B' : 'No limit' }}</td><td class="right"><a href="{{ url('/buckets/'.$bucket->name) }}">Browse</a></td></tr>
+                <tr><td><code>{{ $bucket->name }}</code></td><td class="right">{{ number_format($bucket->active_objects_count) }}</td><td class="right">{{ number_format($bucket->active_bytes ?? 0) }} B</td><td class="right"><form method="post" action="{{ url('/buckets/'.$bucket->name) }}">@csrf @method('PATCH')<input type="number" name="quota_mb" min="1" value="{{ $bucket->quota_bytes ? (int) ($bucket->quota_bytes / 1048576) : '' }}" placeholder="No limit"><button>Save</button></form></td><td class="right"><a href="{{ url('/buckets/'.$bucket->name) }}">Browse</a> @if ($bucket->active_objects_count === 0)<form method="post" action="{{ url('/buckets/'.$bucket->name) }}">@csrf @method('DELETE')<button class="danger">Delete</button></form>@endif</td></tr>
             @empty
                 <tr><td colspan="5" class="muted empty">Create a bucket to begin storing objects.</td></tr>
             @endforelse
@@ -114,7 +114,7 @@
             <h2>Active credentials</h2>
             <div class="table-wrap"><table>
                 @forelse ($keys as $key)
-                    <tr><td><code>{{ $key->access_key }}</code></td><td>{{ implode(', ', $key->scopes ?: ['*']) }}</td><td class="right"><form method="post" action="/keys/{{ $key->id }}">@csrf @method('DELETE') <button class="danger">Revoke</button></form></td></tr>
+                    <tr><td><code>{{ $key->access_key }}</code></td><td><form method="post" action="/keys/{{ $key->id }}">@csrf @method('PATCH')<label><input type="checkbox" name="scopes[]" value="read" @checked(in_array('read', $key->scopes ?? [], true))> Read</label><label><input type="checkbox" name="scopes[]" value="write" @checked(in_array('write', $key->scopes ?? [], true))> Write</label><label><input type="checkbox" name="scopes[]" value="delete" @checked(in_array('delete', $key->scopes ?? [], true))> Delete</label>@foreach ($bucketRows as $bucket)<label><input type="checkbox" name="bucket_names[]" value="{{ $bucket->name }}" @checked(in_array($bucket->name, $key->bucket_names ?? [], true))> {{ $bucket->name }}</label>@endforeach<button>Save</button></form></td><td class="right"><form method="post" action="/keys/{{ $key->id }}">@csrf @method('DELETE') <button class="danger">Revoke</button></form></td></tr>
                 @empty
                     <tr><td class="muted empty">Create a credential to connect an S3 client.</td></tr>
                 @endforelse

@@ -23,7 +23,7 @@ class MultipartUploadTest extends TestCase
 
         $this->withoutMiddleware()->call('PUT', "/s3/media/video.bin?uploadId={$uploadId}&partNumber=1", [], [], [], [], 'hello ')->assertOk();
         $this->withoutMiddleware()->call('PUT', "/s3/media/video.bin?uploadId={$uploadId}&partNumber=2", [], [], [], [], 'world')->assertOk();
-        $complete = $this->withoutMiddleware()->post("/s3/media/video.bin?uploadId={$uploadId}");
+        $complete = $this->withoutMiddleware()->call('POST', "/s3/media/video.bin?uploadId={$uploadId}", [], [], [], [], '<CompleteMultipartUpload><Part><PartNumber>1</PartNumber><ETag>"'.md5('hello ').'"</ETag></Part><Part><PartNumber>2</PartNumber><ETag>"'.md5('world').'"</ETag></Part></CompleteMultipartUpload>');
 
         $complete->assertOk()->assertSee('CompleteMultipartUploadResult');
         $this->assertDatabaseMissing('multipart_uploads', ['upload_id' => $uploadId]);

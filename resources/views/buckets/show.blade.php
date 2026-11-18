@@ -34,6 +34,7 @@
     <section class="card">
         <form class="filter" method="get">
             <input name="prefix" value="{{ $prefix }}" placeholder="Filter by object prefix, for example uploads/2026/" aria-label="Object prefix">
+            <select name="state" aria-label="Object state"><option value="active" @selected($state === 'active')>Active</option><option value="trash" @selected($state === 'trash')>Trash</option></select>
             <button>Filter</button>
         </form>
         <div class="table-wrap"><table>
@@ -42,7 +43,7 @@
             @forelse ($objects as $object)
                 <tr>
                     <td><code>{{ $object->key }}</code></td><td>{{ $object->content_type ?: 'application/octet-stream' }}</td><td class="right">{{ number_format($object->size) }} B</td><td class="right">{{ $object->updated_at->diffForHumans() }}</td>
-                    <td><div class="actions"><a href="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/download') }}">Download</a><form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id) }}">@csrf @method('DELETE')<button class="danger">Delete</button></form></div></td>
+                    <td><div class="actions">@if ($state === 'active')<a href="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/download') }}">Download</a><form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id) }}">@csrf @method('DELETE')<button class="danger">Delete</button></form>@else<form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/restore') }}">@csrf<button>Restore</button></form><form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/purge') }}">@csrf @method('DELETE')<button class="danger">Purge</button></form>@endif</div></td>
                 </tr>
             @empty
                 <tr><td colspan="5" class="muted empty">No active objects match this prefix.</td></tr>
