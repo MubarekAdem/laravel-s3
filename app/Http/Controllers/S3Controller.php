@@ -43,6 +43,21 @@ class S3Controller extends Controller
         return response('', 200);
     }
 
+    public function deleteBucket(Request $request, string $bucket)
+    {
+        $bucketModel = $this->bucket($bucket);
+
+        if ($bucketModel->objects()->exists()) {
+            abort(409, 'Bucket must be empty before it can be deleted.');
+        }
+
+        File::deleteDirectory(config('object-store.root').DIRECTORY_SEPARATOR.$bucketModel->id);
+        $bucketModel->delete();
+        $this->audit($request, 'bucket.delete', $bucket);
+
+        return response('', 204);
+    }
+
     public function list(Request $r, string $bucket)
     {
         $b = $this->bucket($bucket);
