@@ -61,8 +61,22 @@ class S3Controller extends Controller
     public function list(Request $r, string $bucket)
     {
         $b = $this->bucket($bucket);
+        $maxKeys = min(max($r->integer('max-keys', 1000), 1), 1000);
+        $prefix = $r->string('prefix')->toString();
+        $continuationToken = $r->string('continuation-token')->toString();
+        $lastKey = $continuationToken === '' ? null : base64_decode(strtr($continuationToken, '-_', '+/'), true);
+        $query = $b->objects()->whereNull('deleted_at')->where('key', 'like', $prefix.'%')->orderBy('key');
 
-        return $this->xml(['bucket' => $b, 'objects' => $b->objects()->whereNull('deleted_at')->orderBy('key')->get()]);
+        if ($lastKey !== false && $lastKey !== null) {
+            $query->where('key', '>', $lastKey);
+        }
+
+        $objects = $query->limit($maxKeys + 1)->get();
+        $isTruncated = $objects->count() > $maxKeys;
+        $objects = $objects->take($maxKeys)->values();
+        $nextToken = $isTruncated ? rtrim(strtr(base64_encode($objects->last()->key), '+/', '-_'), '=') : null;
+
+        return $this->xml(['bucket' => $b, 'objects' => $objects, 'prefix' => $prefix, 'isTruncated' => $isTruncated, 'nextToken' => $nextToken]);
     }
 
     public function put(Request $r, string $bucket, string $key)
@@ -107,6 +121,13 @@ class S3Controller extends Controller
         }
 
         return response()->file($o->path, ['Content-Type' => $o->content_type ?: 'application/octet-stream', 'ETag' => '"'.$o->etag.'"']);
+    }
+
+    public function head(string $bucket, string $key)
+    {
+        $object = $this->bucket($bucket)->objects()->where('key', $key)->whereNull('deleted_at')->firstOrFail();
+
+        return response('', 200, ['Content-Type' => $object->content_type ?: 'application/octet-stream', 'Content-Length' => $object->size, 'ETag' => '"'.$object->etag.'"', 'Last-Modified' => $object->updated_at->toRfc7231String()]);
     }
 
     public function delete(Request $r, string $bucket, string $key)
