@@ -37,14 +37,24 @@ php -r "file_exists('database/database.sqlite') || touch('database/database.sqli
 php artisan key:generate
 php artisan migrate
 mkdir -p storage/app/object-store
-php artisan object-store:owner owner@example.com --name="Storage Owner"
+php artisan db:seed --class=AdminSeeder
 php artisan object-store:check
 php artisan serve
 ```
 
 On Windows PowerShell, use `Copy-Item .env.example .env` and `New-Item -ItemType Directory -Force storage/app/object-store` in place of `cp` and `mkdir -p`.
 
-Owner creation prompts for a hidden password and confirmation. Use at least 12 characters. The command requires an interactive terminal.
+Before running the seed command, set your initial owner in `.env`:
+
+```dotenv
+ADMIN_NAME="Storage Owner"
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD="choose-a-unique-password-at-least-12-characters"
+```
+
+Run `php artisan config:clear` after changing these values. `AdminSeeder` hashes the password and creates the account only if that email does not already exist. It never resets an existing password. `php artisan db:seed` also runs this seeder; it no longer creates Laravel's demo user. Blank email and password skip admin creation. Keep populated credentials out of Git and remove `ADMIN_PASSWORD` after the initial seed if you no longer need it.
+
+For later password recovery, `php artisan object-store:owner admin@example.com --reset` uses hidden password prompts. See [owner recovery](DEPLOYMENT.md#owner-recovery).
 
 Keep `APP_URL` in `.env` consistent with the address used to access the application. The default development URL is `http://localhost:8000`.
 

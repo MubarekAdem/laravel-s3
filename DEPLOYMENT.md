@@ -58,6 +58,8 @@ chmod -R u+rwX,go-rwx storage bootstrap/cache
 
 Owner creation requires interactive hidden password entry and confirmation, with at least 12 characters. It deliberately cannot run with `--no-interaction`. No password argument or environment variable is accepted. Fix any failing readiness check before opening access. Do not create a public storage symlink for private object data.
 
+Alternatively, create the initial owner from `.env` with `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` (minimum 12 characters; bcrypt allows at most 72 bytes). Clear configuration with `artisan config:clear`, then run `artisan db:seed --class=AdminSeeder --force --no-interaction` instead of the interactive owner-creation command. The seeder never overwrites an existing email's credentials and does not create a demo user. Leave both email and password blank to skip seeding; partial credentials fail validation. Keep the populated `.env` private, remove the bootstrap password after initial creation if no longer needed, and rebuild cached configuration afterward. Password resets continue to use the explicit interactive recovery command below.
+
 6. Add this cPanel cron as the same account, replacing both absolute paths. This runs the configured daily trash purge and hourly abandoned multipart purge. Keep cron error output available during setup; once verified, the example appends it to a private log. Arrange rotation for that log.
 
 ```cron
