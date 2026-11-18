@@ -68,15 +68,21 @@ try {
     const {sessionId} = await call('Target.attachToTarget', {targetId, flatten: true});
     const page = (method, params) => call(method, params, sessionId);
     const evaluate = async expression => (await page('Runtime.evaluate', {expression, returnByValue: true})).result.value;
+    const capture = async params => {
+        await until(() => evaluate('document.readyState === "complete" && document.documentElement.clientWidth > 0'), 'page layout');
+        await page('Runtime.evaluate', {expression: 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))', awaitPromise: true});
+        return page('Page.captureScreenshot', params);
+    };
     await page('Page.enable');
     await page('Runtime.enable');
+    await page('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]});
     for (const [path, name, selector] of [['/', 'landing', '#hero-title'], ['/api/docs', 'api-docs', '.docs-main h1']]) {
         for (const width of [1280, 390]) {
             await page('Emulation.setDeviceMetricsOverride', {width, height: 900, deviceScaleFactor: 1, mobile: false});
             await page('Page.navigate', {url: base + path});
             await until(() => evaluate(`!!document.querySelector(${JSON.stringify(selector)})`), name);
             if (await evaluate('document.documentElement.scrollWidth > innerWidth')) throw new Error(name + ' overflows at ' + width);
-            const screenshot = await page('Page.captureScreenshot', {format: 'png'});
+            const screenshot = await capture({format: 'png'});
             await writeFile(join(screenshots, `${name}-${width}.png`), Buffer.from(screenshot.data, 'base64'));
         }
     }
@@ -85,20 +91,43 @@ try {
         await page('Page.navigate', {url: base + '/login'});
         await until(() => evaluate('!!document.querySelector("input[name=password]")'), 'login');
         if (await evaluate('document.documentElement.scrollWidth > innerWidth')) throw new Error('Login overflows at ' + width);
-        const screenshot = await page('Page.captureScreenshot', {format: 'png'});
+        const screenshot = await capture({format: 'png'});
         await writeFile(join(screenshots, `login-${width}.png`), Buffer.from(screenshot.data, 'base64'));
     }
     await evaluate('document.querySelector("input[name=email]").value="browser@example.test"; document.querySelector("input[name=password]").value="browser-smoke-password"; document.querySelector("form").requestSubmit(); true');
-    await until(() => evaluate('document.querySelector("h1")?.textContent.includes("Object storage")'), 'authenticated dashboard');
+    await until(() => evaluate('!!document.querySelector("[data-console-page]")'), 'authenticated dashboard');
     for (const width of [1280, 390]) {
         await page('Emulation.setDeviceMetricsOverride', {width, height: 900, deviceScaleFactor: 1, mobile: false});
-        if (await evaluate('document.documentElement.scrollWidth > innerWidth')) throw new Error('Dashboard overflows at ' + width);
-        const screenshot = await page('Page.captureScreenshot', {format: 'png', captureBeyondViewport: true});
+        const screenshot = await capture({format: 'png', captureBeyondViewport: true});
         await writeFile(join(screenshots, `dashboard-${width}.png`), Buffer.from(screenshot.data, 'base64'));
+        if (await evaluate('document.documentElement.scrollWidth > innerWidth')) throw new Error('Dashboard overflows at ' + width + ': ' + await evaluate('JSON.stringify({scroll:document.documentElement.scrollWidth,viewport:innerWidth,elements:[...document.querySelectorAll("body *")].filter(e=>e.getBoundingClientRect().right > innerWidth + 1 && !e.closest(".table-wrap")).slice(0,12).map(e=>({tag:e.tagName,class:e.className,width:e.getBoundingClientRect().width,right:e.getBoundingClientRect().right}))})'));
     }
+    for (const view of ['buckets', 'keys', 'activity']) {
+        await page('Page.navigate', {url: base + '/dashboard?view=' + view});
+        await until(() => evaluate(`document.querySelector('.side-link.is-active')?.getAttribute('href').includes('view=${view}')`), view + ' screen');
+        for (const width of [1280, 390]) {
+            await page('Emulation.setDeviceMetricsOverride', {width, height: 900, deviceScaleFactor: 1, mobile: false});
+            if (await evaluate('document.documentElement.scrollWidth > innerWidth')) throw new Error(view + ' overflows at ' + width);
+            const screenshot = await capture({format: 'png', captureBeyondViewport: true});
+            await writeFile(join(screenshots, `${view}-${width}.png`), Buffer.from(screenshot.data, 'base64'));
+        }
+    }
+    await page('Page.navigate', {url: base + '/dashboard?view=buckets'});
+    await until(() => evaluate('!!document.querySelector("button[data-open-dialog=create-bucket]")'), 'bucket creation');
+    await evaluate('document.querySelector("button[data-open-dialog=create-bucket]").click()');
+    await until(() => evaluate('document.querySelector("#create-bucket")?.open'), 'create dialog opens');
+    if (!(await evaluate('document.querySelector("#create-bucket").contains(document.activeElement)'))) throw new Error('Dialog did not move keyboard focus inside');
+    await page('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
+    await page('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
+    await until(() => evaluate('!document.querySelector("#create-bucket")?.open'), 'escape closes dialog');
+    await evaluate('document.querySelector("[data-nav-toggle]").click()');
+    if (!(await evaluate('document.querySelector("[data-nav-toggle]").getAttribute("aria-expanded") === "true"'))) throw new Error('Mobile navigation did not open');
+    await evaluate('document.querySelector("[data-nav-close]").click()');
     await page('Page.navigate', {url: base + '/buckets/media?state=trash'});
     await until(() => evaluate('!!document.querySelector("select[name=state]")'), 'bucket inventory');
     if (await evaluate('document.documentElement.scrollWidth > innerWidth')) throw new Error('Bucket inventory overflows on mobile');
+    const inventoryScreenshot = await capture({format: 'png', captureBeyondViewport: true});
+    await writeFile(join(screenshots, 'inventory-390.png'), Buffer.from(inventoryScreenshot.data, 'base64'));
     if (exceptions.length) throw new Error(exceptions.join('\n'));
     console.log('Browser smoke passed: landing, API docs, login, authenticated dashboard, bucket inventory; desktop and mobile. Screenshots: storage/framework/browser-smoke.');
 } finally {

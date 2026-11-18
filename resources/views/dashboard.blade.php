@@ -1,142 +1,60 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Harbor Storage</title>
-    <style>
-        :root { color-scheme: dark; }
-        body { margin: 0; background: #091827; color: #dbeafe; font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
-        main { max-width: 1120px; margin: auto; padding: 40px 24px 64px; }
-        header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-        h1, h2, p { margin-top: 0; } h1 { margin-bottom: 4px; font-size: clamp(28px, 4vw, 38px); letter-spacing: -.03em; }
-        h2 { font-size: 18px; letter-spacing: -.01em; } .muted { color: #93a4b8; } .eyebrow { margin-bottom: 3px; color: #67e8f9; font-size: 13px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 28px 0 16px; }
-        .card { padding: 20px; background: #10263a; border: 1px solid #24445f; border-radius: 12px; }
-        .number { color: #67e8f9; font-size: 30px; font-weight: 700; } .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-        .form-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px auto; gap: 8px; align-items: end; }
-        label { display: inline-flex; align-items: center; gap: 6px; } .field { display: grid; gap: 5px; color: #b9c8d8; font-size: 13px; }
-        input, button { box-sizing: border-box; border-radius: 7px; padding: 10px; border: 1px solid #355b79; font: inherit; }
-        input:not([type=checkbox]) { width: 100%; background: #0b1d2e; color: #f0f9ff; } input[type=checkbox] { accent-color: #38bdf8; }
-        button { background: #2563eb; color: #fff; border: 0; font-weight: 700; cursor: pointer; } button:hover { background: #1d4ed8; } button:focus-visible, input:focus-visible { outline: 3px solid #67e8f9; outline-offset: 2px; }
-        .danger { background: #7f1d1d; } .danger:hover { background: #991b1b; } .flash, .notice, .errors { margin: 16px 0; padding: 14px; border-radius: 8px; word-break: break-all; }
-        .flash { background: #164e63; } .notice { background: #14532d; } .errors { background: #7f1d1d; } .credentials { display: grid; gap: 12px; }
-        .scope-list { display: flex; flex-wrap: wrap; gap: 10px 16px; margin: 12px 0; } .bucket-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 7px; margin: 10px 0 16px; }
-        table { width: 100%; border-collapse: collapse; } td, th { padding: 11px 6px; border-bottom: 1px solid #24445f; text-align: left; vertical-align: middle; } th { color: #93a4b8; font-size: 12px; font-weight: 600; } .right { text-align: right; } .table-wrap { overflow-x: auto; }
-        code { color: #bae6fd; } a { color: #67e8f9; font-weight: 700; text-decoration: none; } a:hover { text-decoration: underline; } .empty { padding: 10px 0; } @media (max-width: 720px) { main { padding: 28px 16px 48px; } header, .split { display: block; } header form { margin-top: 16px; } .split > * { margin-bottom: 16px; } .form-row { grid-template-columns: 1fr; } }
-    </style>
-</head>
-<body>
-<main>
-    <header>
+@extends('layouts.console')
+@php($titles = ['overview' => 'Storage overview', 'buckets' => 'Buckets', 'keys' => 'Access keys', 'activity' => 'Activity log'])
+@section('title', $titles[$activeView])
+@section('breadcrumb', $titles[$activeView])
+
+@section('content')
+<div class="page-heading">
+    <div><h1 class="page-title">{{ $titles[$activeView] }}</h1><p class="page-subtitle">{{ ['overview' => 'Object storage on this server. A clear view of everything you store.', 'buckets' => 'A place for every object. Organize files and control storage limits.', 'keys' => 'Connect your applications with permissions you control.', 'activity' => 'A record of what changed, when, and who was behind it.'][$activeView] }}</p></div>
+    <div class="heading-actions">
+        @if ($activeView === 'keys')<button type="button" class="btn btn-primary" data-open-dialog="create-key"><x-console-icon name="plus" />Create access key</button>
+        @elseif ($activeView !== 'activity')<button type="button" class="btn btn-primary" data-open-dialog="create-bucket"><x-console-icon name="plus" />Create bucket</button>@endif
+    </div>
+</div>
+
+@if (session('created_secret'))
+    <section class="secret-panel" aria-labelledby="credential-created"><h2 id="credential-created"><x-console-icon name="shield" /> Your access key is ready</h2><p>Copy these credentials now. The secret is only shown once.</p><div class="secret-field"><span>Access key</span><code id="created-access-key">{{ session('created_secret')[0] }}</code><button type="button" class="icon-button" data-copy="created-access-key" aria-label="Copy new access key"><x-console-icon name="copy" /></button></div><div class="secret-field"><span>Secret</span><code id="created-secret">{{ session('created_secret')[1] }}</code><button type="button" class="icon-button" data-copy="created-secret" aria-label="Copy secret"><x-console-icon name="copy" /></button></div></section>
+@endif
+
+@if ($activeView === 'overview')
+    <div class="metric-strip" aria-label="Storage summary">
+        <div class="metric"><div class="metric-label">Storage used<x-console-icon name="server" /></div><strong class="metric-value"><x-byte-size :bytes="$bytes" /></strong><p class="metric-note">Across all active objects</p></div>
+        <div class="metric"><div class="metric-label">Objects stored<x-console-icon name="file" /></div><strong class="metric-value">{{ number_format($objects) }}</strong><p class="metric-note">Files available to your applications</p></div>
+        <div class="metric"><div class="metric-label">Your buckets<x-console-icon name="bucket" /></div><strong class="metric-value">{{ number_format($buckets) }}</strong><p class="metric-note"><a href="{{ route('dashboard', ['view' => 'buckets']) }}">Manage your storage spaces</a></p></div>
+    </div>
+    <div class="overview-grid">
         <div>
-            <p class="eyebrow"><a href="{{ route('home') }}">Harbor Storage</a> / control room · <a href="{{ route('api.docs') }}">API docs</a></p>
-            <h1>Object storage on this server.</h1>
+            <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Your buckets <span class="badge badge-neutral">{{ $buckets }}</span></h2><p class="panel-subtitle">An overview of your storage spaces.</p></div><a class="text-link" href="{{ route('dashboard', ['view' => 'buckets']) }}">View all<x-console-icon name="arrow-right" /></a></div>@include('console.partials.bucket-table', ['rows' => $bucketRows->take(5), 'compact' => true])</section>
+            <div class="getting-started"><x-console-icon name="book" /><div><h3>Your next integration starts here.</h3><p>Signed requests, multipart uploads, and examples you can copy.</p></div><a class="btn btn-secondary btn-sm" href="{{ route('api.docs') }}">Explore the API<x-console-icon name="external" /></a></div>
         </div>
-        <form method="post" action="/logout">@csrf <button>Sign out</button></form>
-    </header>
-
-    @if (session('created_secret'))
-        <p class="flash">Access key: <b>{{ session('created_secret')[0] }}</b><br>Secret: <b>{{ session('created_secret')[1] }}</b><br>Copy the secret now. It will not be shown again.</p>
-    @endif
-    @if (session('status')) <p class="notice">{{ session('status') }}</p> @endif
-    @if ($errors->any())
-        <div class="errors"><strong>Could not save changes.</strong><br>{{ $errors->first() }}</div>
-    @endif
-
-    <div class="grid">
-        <div class="card"><span class="number">{{ $buckets }}</span><br>Buckets</div>
-        <div class="card"><span class="number">{{ $objects }}</span><br>Active objects</div>
-        <div class="card"><span class="number">{{ number_format($bytes) }}</span><br>Bytes stored</div>
+        <div class="stack">
+            <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Connect your application</h2><p class="panel-subtitle">One endpoint. Your infrastructure.</p></div><x-console-icon name="server" class="text-muted" /></div><div class="panel-body"><div class="endpoint-box"><code id="storage-endpoint">{{ rtrim(config('app.url'), '/') }}/s3</code><button type="button" class="icon-button" data-copy="storage-endpoint" aria-label="Copy S3 endpoint"><x-console-icon name="copy" /></button></div><dl class="detail-list"><div><dt>Region</dt><dd>{{ config('object-store.region') }}</dd></div><div><dt>Authentication</dt><dd>Signature V4</dd></div><div><dt>Addressing</dt><dd>Path-style</dd></div></dl><div class="connection-footer"><span class="badge badge-green"><x-console-icon name="shield" />Scoped credentials</span><a class="text-link" href="{{ route('dashboard', ['view' => 'keys']) }}">Manage keys<x-console-icon name="arrow-right" /></a></div></div></section>
+            <section class="panel"><div class="panel-header"><h2 class="panel-title">Recent activity</h2><a class="text-link" href="{{ route('dashboard', ['view' => 'activity']) }}">View log<x-console-icon name="arrow-right" /></a></div><div class="panel-body">@if ($events->isEmpty())<div class="empty-state"><div class="empty-icon"><x-console-icon name="activity" /></div><h3>A fresh start.</h3><p>Your storage activity will appear here as you begin using Harbor.</p></div>@else<ul class="timeline">@foreach ($events->take(4) as $event)<li><span class="timeline-icon"><x-console-icon :name="str_contains($event->action, 'delete') ? 'trash' : 'file'" /></span><div class="timeline-content"><strong>{{ str_replace('.', ' / ', $event->action) }}</strong><p>{{ $event->object_key ?: $event->bucket ?: 'Workspace' }}</p><time datetime="{{ $event->created_at->toAtomString() }}">{{ $event->created_at->diffForHumans() }}</time></div></li>@endforeach</ul>@endif</div></section>
+        </div>
     </div>
+@elseif ($activeView === 'buckets')
+    <section class="panel"><div class="panel-header"><div><h2 class="panel-title">All buckets <span class="badge badge-neutral">{{ $buckets }}</span></h2><p class="panel-subtitle">Private by default. Ready for your applications.</p></div><span class="badge badge-blue">{{ config('object-store.region') }}</span></div><div class="toolbar"><form method="get" action="{{ route('dashboard') }}"><input type="hidden" name="view" value="buckets"><div class="toolbar-search"><x-console-icon name="search" /><input class="input" name="usage_bucket" value="{{ $activityFilters['usage_bucket'] ?? '' }}" placeholder="Filter by bucket name…" aria-label="Filter buckets by name" list="bucket-names"></div><datalist id="bucket-names">@foreach ($bucketRows as $bucket)<option value="{{ $bucket->name }}">@endforeach</datalist><button class="btn btn-secondary" type="submit">Filter</button>@if (!empty($activityFilters['usage_bucket']))<a class="btn btn-quiet" href="{{ route('dashboard', ['view' => 'buckets']) }}">Clear</a>@endif</form><span class="toolbar-note">{{ $usageRows->count() }} {{ Str::plural('bucket', $usageRows->count()) }}</span></div>@include('console.partials.bucket-table', ['rows' => $usageRows, 'compact' => false])</section>
+@elseif ($activeView === 'keys')
+    <div class="alert alert-success"><x-console-icon name="shield" /><span>Give each application its own key. Use bucket restrictions and grant only the permissions it needs.</span></div>
+    <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Active credentials <span class="badge badge-neutral">{{ $keys->count() }}</span></h2><p class="panel-subtitle">Secrets are only shown when a key is created.</p></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Access key</th><th>Permissions</th><th>Bucket access</th><th>Created</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>@forelse ($keys as $key)<tr><td><div class="table-name"><span class="name-icon"><x-console-icon name="key" /></span><code id="access-key-{{ $key->id }}" class="mono">{{ $key->access_key }}</code><button class="icon-button" type="button" data-copy="access-key-{{ $key->id }}" aria-label="Copy access key {{ $key->access_key }}"><x-console-icon name="copy" /></button></div></td><td>@foreach ($key->scopes ?? [] as $scope)<span class="badge {{ $scope === 'delete' ? 'badge-amber' : 'badge-blue' }}">{{ $scope === '*' ? 'All permissions' : ucfirst($scope) }}</span> @endforeach</td><td><span class="text-muted">{{ $key->bucket_names ? implode(', ', $key->bucket_names) : 'All buckets' }}</span></td><td class="text-muted">{{ $key->created_at->format('M j, Y') }}</td><td><div class="row-actions"><button class="btn btn-secondary btn-sm" type="button" data-open-dialog="edit-key-{{ $key->id }}">Edit permissions</button><button class="icon-button" type="button" data-open-dialog="revoke-key-{{ $key->id }}" aria-label="Revoke {{ $key->access_key }}"><x-console-icon name="trash" /></button></div></td></tr>@empty<tr><td colspan="5"><div class="empty-state"><div class="empty-icon"><x-console-icon name="key" /></div><h3>Let your applications in.</h3><p>Create a scoped access key to connect your first application.</p><button class="btn btn-primary" type="button" data-open-dialog="create-key"><x-console-icon name="plus" />Create access key</button></div></td></tr>@endforelse</tbody></table></div></section>
+@else
+    <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Workspace activity</h2><p class="panel-subtitle">{{ number_format($events->total()) }} matching {{ Str::plural('event', $events->total()) }}</p></div><span class="badge badge-neutral">Audit trail</span></div><div class="toolbar"><form method="get" action="{{ route('dashboard') }}"><input type="hidden" name="view" value="activity"><label class="field">Search<input class="input" name="activity_search" value="{{ $activityFilters['activity_search'] ?? '' }}" placeholder="Actor or object key"></label><label class="field">Bucket<input class="input" name="activity_bucket" value="{{ $activityFilters['activity_bucket'] ?? '' }}" placeholder="All buckets"></label><label class="field">Action<input class="input" name="activity_action" value="{{ $activityFilters['activity_action'] ?? '' }}" placeholder="e.g. object.put"></label><button class="btn btn-secondary" type="submit"><x-console-icon name="search" />Filter activity</button><a class="btn btn-quiet" href="{{ route('dashboard', ['view' => 'activity']) }}">Reset</a></form></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Action</th><th>Object / bucket</th><th>Actor</th><th>When</th></tr></thead><tbody>@forelse ($events as $event)<tr><td><div class="table-name"><span class="name-icon"><x-console-icon :name="str_contains($event->action, 'delete') ? 'trash' : 'activity'" /></span>{{ $event->action }}</div></td><td><code class="mono">{{ $event->object_key ?: '—' }}</code><small class="table-subline">{{ $event->bucket ?: 'Workspace' }}</small></td><td class="text-muted">{{ $event->actor ?: 'System' }}</td><td class="text-muted"><time datetime="{{ $event->created_at->toAtomString() }}" title="{{ $event->created_at->toDateTimeString() }}">{{ $event->created_at->diffForHumans() }}</time></td></tr>@empty<tr><td colspan="4"><div class="empty-state"><div class="empty-icon"><x-console-icon name="activity" /></div><h3>No matching activity.</h3><p>Try a different bucket, action, or search term.</p></div></td></tr>@endforelse</tbody></table></div>@if ($events->hasPages())<div class="pagination"><span>Page {{ $events->currentPage() }} of {{ $events->lastPage() }}</span><nav aria-label="Activity pages">@if ($events->previousPageUrl())<a class="btn btn-sm" href="{{ $events->previousPageUrl() }}">Previous</a>@endif @if ($events->nextPageUrl())<a class="btn btn-sm" href="{{ $events->nextPageUrl() }}">Next<x-console-icon name="chevron-right" /></a>@endif</nav></div>@endif</section>
+@endif
 
-    <div class="split">
-        <section class="card">
-            <h2>Create a bucket</h2>
-            <form method="post" action="/buckets" class="form-row">
-                @csrf
-                <label class="field">Bucket name <input name="name" value="{{ old('name') }}" placeholder="media-assets" required></label>
-                <label class="field">Quota (MB) <input type="number" name="quota_mb" value="{{ old('quota_mb') }}" min="1" placeholder="No limit"></label>
-                <button>Create bucket</button>
-            </form>
-            <p class="muted">Use 3–63 lowercase letters, numbers, dots, or hyphens. Leave quota blank for no limit.</p>
-        </section>
+<dialog id="create-bucket" class="dialog" aria-labelledby="create-bucket-title" @if ($errors->any() && old('_ui_form') === 'create-bucket') data-reopen @endif>
+    <div class="dialog-header"><div><h2 id="create-bucket-title">Create a bucket</h2><p>A home for your next set of objects.</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close"><x-console-icon name="close" /></button></div><form method="post" action="{{ url('/buckets') }}">@csrf<input type="hidden" name="_ui_form" value="create-bucket"><div class="dialog-body"><label class="field" for="new-bucket-name">Bucket name<input id="new-bucket-name" class="input" name="name" value="{{ old('name') }}" placeholder="e.g. project-assets" minlength="3" maxlength="63" required></label><p class="field-hint">3–63 lowercase letters, numbers, dots, or hyphens.</p><label class="field" for="new-bucket-quota">Storage quota (MiB)<input id="new-bucket-quota" class="input" type="number" name="quota_mb" value="{{ old('quota_mb') }}" min="1" max="1048576" placeholder="No limit"></label><p class="field-hint">Optional. Leave blank to use available server storage.</p></div><div class="dialog-footer"><button class="btn btn-secondary" type="button" data-close-dialog>Cancel</button><button class="btn btn-primary" type="submit"><x-console-icon name="plus" />Create bucket</button></div></form>
+</dialog>
 
-        <section class="card">
-            <h2>Recent activity</h2>
-            <form method="get" class="scope-list"><input name="activity_bucket" value="{{ $activityFilters['activity_bucket'] ?? '' }}" placeholder="Bucket" aria-label="Activity bucket"><input name="activity_action" value="{{ $activityFilters['activity_action'] ?? '' }}" placeholder="Action" aria-label="Activity action"><input name="activity_search" value="{{ $activityFilters['activity_search'] ?? '' }}" placeholder="Actor or object key" aria-label="Search activity"><button>Filter activity</button></form><table>
-                @forelse ($events as $event)
-                    <tr><td>{{ $event->action }}<br><span class="muted">{{ $event->actor }}</span></td><td>{{ $event->bucket }}<br><code>{{ $event->object_key }}</code></td><td class="muted right">{{ $event->created_at->diffForHumans() }}</td></tr>
-                @empty
-                    <tr><td class="muted empty">No storage activity yet.</td></tr>
-                @endforelse
-            </table>
-            @if ($events->hasPages())<nav aria-label="Activity pages">@if ($events->previousPageUrl())<a href="{{ $events->previousPageUrl() }}">Previous</a>@endif <span class="muted">Page {{ $events->currentPage() }} of {{ $events->lastPage() }}</span> @if ($events->nextPageUrl())<a href="{{ $events->nextPageUrl() }}">Next</a>@endif</nav>@endif
-        </section>
-    </div>
+<dialog id="create-key" class="dialog" aria-labelledby="create-key-title" @if ($errors->any() && old('_ui_form') === 'create-key') data-reopen @endif>
+    <div class="dialog-header"><div><h2 id="create-key-title">Create access key</h2><p>Choose what this application can access.</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close"><x-console-icon name="close" /></button></div><form method="post" action="{{ url('/keys') }}">@csrf<input type="hidden" name="_ui_form" value="create-key"><div class="dialog-body">@include('console.partials.key-permissions', ['selectedScopes' => old('scopes', ['read', 'write', 'list']), 'selectedBuckets' => old('bucket_names', []), 'identifier' => 'create'])<div class="alert alert-success"><x-console-icon name="info" /><span>The secret will be shown once. Keep it somewhere safe.</span></div></div><div class="dialog-footer"><button class="btn btn-secondary" type="button" data-close-dialog>Cancel</button><button class="btn btn-primary" type="submit">Create access key</button></div></form>
+</dialog>
 
-    <section class="card" style="margin-bottom:16px">
-        <h2>Buckets</h2>
-        <form method="get" class="scope-list"><label class="field">Usage by bucket<input name="usage_bucket" value="{{ $activityFilters['usage_bucket'] ?? '' }}" placeholder="All buckets"></label><button>Filter usage</button></form>
-        <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th class="right">Objects</th><th class="right">Stored</th><th class="right">Quota</th><th></th></tr></thead>
-            <tbody>
-            @forelse ($usageRows as $bucket)
-                <tr><td><code>{{ $bucket->name }}</code></td><td class="right">{{ number_format($bucket->active_objects_count) }}</td><td class="right">{{ number_format($bucket->active_bytes ?? 0) }} B</td><td class="right"><form method="post" action="{{ url('/buckets/'.$bucket->name) }}">@csrf @method('PATCH')<input type="number" name="quota_mb" min="1" value="{{ $bucket->quota_bytes ? (int) ($bucket->quota_bytes / 1048576) : '' }}" placeholder="No limit"><button>Save</button></form></td><td class="right"><a href="{{ url('/buckets/'.$bucket->name) }}">Browse</a> @if ($bucket->active_objects_count === 0)<form method="post" action="{{ url('/buckets/'.$bucket->name) }}">@csrf @method('DELETE')<button class="danger">Delete</button></form>@endif</td></tr>
-            @empty
-                <tr><td colspan="5" class="muted empty">Create a bucket to begin storing objects.</td></tr>
-            @endforelse
-            </tbody>
-        </table></div>
-    </section>
-
-    <div class="split">
-        <section class="card">
-            <h2>Create API key</h2>
-            <form method="post" action="/keys" class="credentials">
-                @csrf
-                <div class="scope-list">
-                    <label><input type="checkbox" name="scopes[]" value="read" checked> Read</label>
-                    <label><input type="checkbox" name="scopes[]" value="list" checked> List buckets and objects</label>
-                    <label><input type="checkbox" name="scopes[]" value="write" checked> Write</label>
-                    <label><input type="checkbox" name="scopes[]" value="delete"> Delete</label>
-                </div>
-                @if ($bucketRows->isNotEmpty())
-                    <div><span class="muted">Limit this key to selected buckets (leave clear for every bucket).</span><div class="bucket-list">
-                        @foreach ($bucketRows as $bucket)
-                            <label><input type="checkbox" name="bucket_names[]" value="{{ $bucket->name }}"> {{ $bucket->name }}</label>
-                        @endforeach
-                    </div></div>
-                @endif
-                <button>Create credential</button>
-            </form>
-            <p class="muted">Endpoint: <code>{{ url('/s3') }}</code></p>
-        </section>
-
-        <section class="card">
-            <h2>Active credentials</h2>
-            <div class="table-wrap"><table>
-                @forelse ($keys as $key)
-                    <tr>
-                        <td><code>{{ $key->access_key }}</code></td>
-                        <td><form method="post" action="/keys/{{ $key->id }}">@csrf @method('PATCH')
-                            <fieldset><legend>Permissions</legend>
-                            @foreach (['read' => 'Read', 'write' => 'Write', 'delete' => 'Delete', 'list' => 'List buckets and objects'] as $scope => $label)
-                                <label><input type="checkbox" name="scopes[]" value="{{ $scope }}" @checked(in_array($scope, $key->scopes ?? [], true) || in_array('*', $key->scopes ?? [], true))> {{ $label }}</label>
-                            @endforeach
-                            </fieldset>
-                            <fieldset><legend>Allowed buckets (none selected means all)</legend>
-                            @foreach ($bucketRows as $bucket)<label><input type="checkbox" name="bucket_names[]" value="{{ $bucket->name }}" @checked(in_array($bucket->name, $key->bucket_names ?? [], true))> {{ $bucket->name }}</label>@endforeach
-                            </fieldset><button>Save permissions</button>
-                        </form></td>
-                        <td class="right"><form method="post" action="/keys/{{ $key->id }}">@csrf @method('DELETE') <button class="danger">Revoke</button></form></td>
-                    </tr>
-                @empty
-                    <tr><td class="muted empty">Create a credential to connect an S3 client.</td></tr>
-                @endforelse
-            </table></div>
-        </section>
-    </div>
-</main>
-</body>
-</html>
+@foreach ($bucketRows as $bucket)
+    <dialog id="quota-{{ $bucket->id }}" class="dialog" aria-labelledby="quota-title-{{ $bucket->id }}"><div class="dialog-header"><div><h2 id="quota-title-{{ $bucket->id }}">Edit storage quota</h2><p>{{ $bucket->name }}</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close"><x-console-icon name="close" /></button></div><form method="post" action="{{ url('/buckets/'.$bucket->name) }}">@csrf @method('PATCH')<div class="dialog-body"><label class="field" for="quota-input-{{ $bucket->id }}">Quota (MiB)<input id="quota-input-{{ $bucket->id }}" class="input" name="quota_mb" type="number" min="1" max="1048576" value="{{ $bucket->quota_bytes ? (int) ($bucket->quota_bytes / 1048576) : '' }}" placeholder="No limit"></label><p class="field-hint">Currently using <x-byte-size :bytes="$bucket->active_bytes ?? 0" />. The quota cannot be lower than current usage.</p></div><div class="dialog-footer"><button class="btn btn-secondary" type="button" data-close-dialog>Cancel</button><button class="btn btn-primary" type="submit">Save quota</button></div></form></dialog>
+    @if ($bucket->objects_count === 0 && $bucket->multipart_uploads_count === 0)<dialog id="delete-bucket-{{ $bucket->id }}" class="dialog" aria-labelledby="delete-bucket-title-{{ $bucket->id }}"><div class="dialog-header"><div><h2 id="delete-bucket-title-{{ $bucket->id }}">Delete this bucket?</h2><p>{{ $bucket->name }}</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close"><x-console-icon name="close" /></button></div><div class="dialog-body"><p class="danger-note">This empty bucket will be removed permanently. Applications using its name will no longer be able to access it.</p></div><form method="post" action="{{ url('/buckets/'.$bucket->name) }}">@csrf @method('DELETE')<div class="dialog-footer"><button class="btn btn-secondary" type="button" data-close-dialog>Keep bucket</button><button class="btn btn-danger" type="submit">Delete bucket</button></div></form></dialog>@endif
+@endforeach
+@foreach ($keys as $key)
+    <dialog id="edit-key-{{ $key->id }}" class="dialog" aria-labelledby="edit-key-title-{{ $key->id }}"><div class="dialog-header"><div><h2 id="edit-key-title-{{ $key->id }}">Edit permissions</h2><p class="mono">{{ $key->access_key }}</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close"><x-console-icon name="close" /></button></div><form method="post" action="{{ url('/keys/'.$key->id) }}">@csrf @method('PATCH')<div class="dialog-body">@include('console.partials.key-permissions', ['selectedScopes' => $key->scopes ?? [], 'selectedBuckets' => $key->bucket_names ?? [], 'identifier' => 'edit-'.$key->id])</div><div class="dialog-footer"><button class="btn btn-secondary" type="button" data-close-dialog>Cancel</button><button class="btn btn-primary" type="submit">Save permissions</button></div></form></dialog>
+    <dialog id="revoke-key-{{ $key->id }}" class="dialog" aria-labelledby="revoke-title-{{ $key->id }}"><div class="dialog-header"><div><h2 id="revoke-title-{{ $key->id }}">Revoke access key?</h2><p class="mono">{{ $key->access_key }}</p></div><button class="icon-button" type="button" data-close-dialog aria-label="Close"><x-console-icon name="close" /></button></div><div class="dialog-body"><p class="danger-note">Applications using this key will immediately lose access. This action cannot be undone.</p></div><form method="post" action="{{ url('/keys/'.$key->id) }}">@csrf @method('DELETE')<div class="dialog-footer"><button class="btn btn-secondary" type="button" data-close-dialog>Keep access key</button><button class="btn btn-danger" type="submit">Revoke key</button></div></form></dialog>
+@endforeach
+@endsection

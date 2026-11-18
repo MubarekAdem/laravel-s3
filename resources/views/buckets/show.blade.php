@@ -1,60 +1,211 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $bucket->name }} · Harbor Storage</title>
+@extends('layouts.console')
+
+@section('title', $bucket->name)
+@section('page-title', $bucket->name)
+
+@section('breadcrumb')
+    <a href="{{ route('dashboard', ['view' => 'buckets']) }}">Buckets</a>
+    <x-console-icon name="chevron-right" />
+    <span aria-current="page">{{ $bucket->name }}</span>
+@endsection
+
+@push('styles')
     <style>
-        :root { color-scheme: dark; }
-        body { margin: 0; background: #091827; color: #dbeafe; font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
-        main { max-width: 1120px; margin: auto; padding: 40px 24px 64px; } h1, h2, p { margin-top: 0; } h1 { margin-bottom: 4px; font-size: clamp(28px, 4vw, 38px); letter-spacing: -.03em; }
-        .eyebrow, .muted { color: #93a4b8; } .eyebrow { margin-bottom: 6px; } .card { padding: 20px; background: #10263a; border: 1px solid #24445f; border-radius: 12px; }
-        .toolbar { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 24px; } .stats { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0 24px; } .stat { min-width: 150px; } .number { display: block; color: #67e8f9; font-size: 24px; font-weight: 700; }
-        .filter { display: flex; gap: 8px; margin-bottom: 18px; } input, button { box-sizing: border-box; border-radius: 7px; padding: 10px; border: 1px solid #355b79; font: inherit; } input { flex: 1; background: #0b1d2e; color: #f0f9ff; } button { background: #2563eb; color: #fff; border: 0; font-weight: 700; cursor: pointer; } .danger { background: #7f1d1d; } .danger:hover { background: #991b1b; }
-        button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid #67e8f9; outline-offset: 2px; } a { color: #67e8f9; font-weight: 700; text-decoration: none; } a:hover { text-decoration: underline; } code { color: #bae6fd; overflow-wrap: anywhere; }
-        table { width: 100%; border-collapse: collapse; } td, th { padding: 12px 7px; border-bottom: 1px solid #24445f; text-align: left; vertical-align: middle; } th { color: #93a4b8; font-size: 12px; font-weight: 600; } .right { text-align: right; } .table-wrap { overflow-x: auto; } .actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; } .actions button { padding: 7px 9px; } .notice { margin-bottom: 16px; padding: 14px; border-radius: 8px; background: #14532d; } .empty { padding: 18px 0; } .pagination { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 18px; }
-        @media (max-width: 720px) { main { padding: 28px 16px 48px; } .toolbar { display: block; } .toolbar > a { display: inline-block; margin-top: 12px; } .actions { justify-content: flex-start; } }
+        .bucket-browser .bucket-heading { overflow-wrap: anywhere; }
+        .bucket-browser .bucket-filters { align-items: end; flex-wrap: wrap; padding: 20px; }
+        .bucket-browser .bucket-prefix { flex: 1 1 280px; }
+        .bucket-browser .bucket-state { flex: 0 1 180px; }
+        .bucket-browser .bucket-object { display: flex; align-items: center; gap: 12px; min-width: 240px; }
+        .bucket-browser .bucket-object > svg { flex: 0 0 20px; color: #64748b; }
+        .bucket-browser .bucket-object-name { font-weight: 600; overflow-wrap: anywhere; }
+        .bucket-browser .bucket-object-path { margin-top: 4px; font-size: 12px; overflow-wrap: anywhere; }
+        .bucket-browser .bucket-type { max-width: 220px; overflow-wrap: anywhere; }
+        .bucket-browser .bucket-modified { white-space: nowrap; }
+        .bucket-browser .bucket-pagination { flex-wrap: wrap; gap: 12px; padding: 20px; }
+        .bucket-purge .bucket-purge-key { overflow-wrap: anywhere; }
+        .bucket-purge .bucket-confirm { display: flex; align-items: start; gap: 10px; }
+        .bucket-purge .bucket-confirm input { margin-top: 4px; flex: 0 0 auto; }
+        @media (max-width: 640px) {
+            .bucket-browser .bucket-state { flex: 1 1 180px; }
+            .bucket-browser .bucket-filters > .btn { width: 100%; }
+        }
     </style>
-</head>
-<body>
-<main>
-    <div class="toolbar">
-        <div><p class="eyebrow"><a href="{{ route('dashboard') }}">Harbor Storage</a> / bucket inventory</p><h1><code>{{ $bucket->name }}</code></h1></div>
-        <a href="{{ route('dashboard') }}">Back to control room</a>
+@endpush
+
+@section('content')
+    <div class="bucket-browser">
+        <div class="page-heading">
+            <div>
+                <p class="page-eyebrow">Bucket inventory</p>
+                <h1 class="page-title bucket-heading">{{ $bucket->name }}</h1>
+                <p class="page-subtitle">Browse objects, download files, and manage this bucket’s trash.</p>
+            </div>
+            <a class="btn btn-secondary" href="{{ route('dashboard', ['view' => 'buckets']) }}"><x-console-icon name="arrow-left" /> All buckets</a>
+        </div>
+
+        <div class="metric-strip" aria-label="Bucket summary">
+            <div class="metric">
+                <div class="metric-label">Matching objects</div>
+                <div class="metric-value">{{ number_format($objects->total()) }}</div>
+                <div class="metric-note">{{ $state === 'trash' ? 'Trash' : 'Active' }}{{ $prefix !== '' ? ' · Filtered by prefix' : '' }}</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Stored in bucket</div>
+                <div class="metric-value"><x-byte-size :bytes="$usedBytes" /></div>
+                <div class="metric-note">Bucket storage usage</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Storage quota</div>
+                <div class="metric-value">
+                    @if ($bucket->quota_bytes)
+                        <x-byte-size :bytes="$bucket->quota_bytes" />
+                    @else
+                        No limit
+                    @endif
+                </div>
+                <div class="metric-note">{{ $bucket->quota_bytes ? 'Configured bucket limit' : 'No bucket quota configured' }}</div>
+            </div>
+        </div>
+
+        <section class="panel" aria-labelledby="bucket-objects-title">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title" id="bucket-objects-title">Objects</h2>
+                    <p class="panel-subtitle">{{ $state === 'trash' ? 'Restore objects or permanently delete them from storage.' : 'Files stored under their full object keys.' }}</p>
+                </div>
+            </div>
+            <nav class="tabs" aria-label="Object state">
+                <a class="{{ $state === 'active' ? 'active' : '' }}" href="{{ url()->current() }}?{{ http_build_query(['state' => 'active', 'prefix' => $prefix]) }}" @if ($state === 'active') aria-current="page" @endif><x-console-icon name="file" /> Active</a>
+                <a class="{{ $state === 'trash' ? 'active' : '' }}" href="{{ url()->current() }}?{{ http_build_query(['state' => 'trash', 'prefix' => $prefix]) }}" @if ($state === 'trash') aria-current="page" @endif><x-console-icon name="trash" /> Trash</a>
+            </nav>
+
+            <form class="toolbar bucket-filters" method="get" action="{{ url()->current() }}" role="search" aria-label="Filter objects">
+                <div class="field bucket-prefix">
+                    <label for="bucket-prefix">Object prefix</label>
+                    <div class="input-group toolbar-search">
+                        <x-console-icon name="search" />
+                        <input class="input" id="bucket-prefix" name="prefix" value="{{ $prefix }}" placeholder="e.g. uploads/2026/" type="search">
+                    </div>
+                </div>
+                <div class="field bucket-state">
+                    <label for="bucket-state">Object state</label>
+                    <select class="input" id="bucket-state" name="state">
+                        <option value="active" @selected($state === 'active')>Active</option>
+                        <option value="trash" @selected($state === 'trash')>Trash</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" type="submit">Filter</button>
+                @if ($prefix !== '')
+                    <a class="btn btn-quiet" href="{{ url()->current() }}?{{ http_build_query(['state' => $state]) }}">Clear prefix</a>
+                @endif
+            </form>
+
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Object key</th>
+                            <th scope="col">Type</th>
+                            <th scope="col" class="text-right">Size</th>
+                            <th scope="col">Modified</th>
+                            <th scope="col">Visibility</th>
+                            <th scope="col" class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($objects as $object)
+                            <tr>
+                                <td>
+                                    <div class="bucket-object">
+                                        <x-console-icon name="file" />
+                                        <div>
+                                            <div class="bucket-object-name">{{ basename($object->key) }}</div>
+                                            <div class="bucket-object-path mono text-muted">{{ $object->key }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="bucket-type text-muted">{{ $object->content_type ?: 'application/octet-stream' }}</td>
+                                <td class="text-right"><x-byte-size :bytes="$object->size" /></td>
+                                <td class="bucket-modified text-muted"><time datetime="{{ $object->updated_at->toIso8601String() }}" title="{{ $object->updated_at->toDayDateTimeString() }}">{{ $object->updated_at->diffForHumans() }}</time></td>
+                                <td><span class="badge {{ $object->is_public ? 'badge-green' : 'badge-neutral' }}">{{ $object->is_public ? 'Public' : 'Private' }}</span></td>
+                                <td>
+                                    <div class="row-actions">
+                                        @if ($state === 'active')
+                                            <a class="btn btn-secondary btn-sm" href="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/download') }}" aria-label="Download {{ $object->key }}"><x-console-icon name="download" /> Download</a>
+                                            <form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id) }}">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button class="btn btn-quiet btn-sm" type="submit" aria-label="Move {{ $object->key }} to trash"><x-console-icon name="trash" /> Move to trash</button>
+                                            </form>
+                                        @else
+                                            <form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/restore') }}">
+                                                @csrf
+                                                <button class="btn btn-secondary btn-sm" type="submit" aria-label="Restore {{ $object->key }}"><x-console-icon name="restore" /> Restore</button>
+                                            </form>
+                                            <button class="btn btn-danger btn-sm" type="button" data-open-dialog="purge-object-{{ $object->id }}" aria-label="Permanently delete {{ $object->key }}"><x-console-icon name="trash" /> Permanently delete</button>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6">
+                                    <div class="empty-state">
+                                        <div class="empty-icon"><x-console-icon :name="$state === 'trash' ? 'trash' : 'file'" /></div>
+                                        <h3>{{ $prefix !== '' ? 'No matching objects' : ($state === 'trash' ? 'Trash is empty' : 'No active objects') }}</h3>
+                                        <p>{{ $prefix !== '' ? 'No '.($state === 'trash' ? 'trashed' : 'active').' objects match this prefix. Try a shorter prefix or clear the filter.' : ($state === 'trash' ? 'Objects moved to trash will appear here so you can restore or permanently delete them.' : 'Upload files with your S3 client to see them here, or check the trash for objects to restore.') }}</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            @if ($objects->hasPages())
+                <div class="pagination bucket-pagination">
+                    <span class="text-muted">Showing {{ number_format($objects->firstItem()) }}–{{ number_format($objects->lastItem()) }} of {{ number_format($objects->total()) }}</span>
+                    <nav class="row-actions" aria-label="Object pagination">
+                        @if ($objects->onFirstPage())
+                            <span class="btn btn-quiet btn-sm" aria-disabled="true">Previous</span>
+                        @else
+                            <a class="btn btn-secondary btn-sm" rel="prev" href="{{ $objects->appends(['state' => $state, 'prefix' => $prefix])->previousPageUrl() }}">Previous</a>
+                        @endif
+                        @if ($objects->hasMorePages())
+                            <a class="btn btn-secondary btn-sm" rel="next" href="{{ $objects->appends(['state' => $state, 'prefix' => $prefix])->nextPageUrl() }}">Next</a>
+                        @else
+                            <span class="btn btn-quiet btn-sm" aria-disabled="true">Next</span>
+                        @endif
+                    </nav>
+                </div>
+            @endif
+        </section>
     </div>
 
-    @if (session('status')) <p class="notice">{{ session('status') }}</p> @endif
-    @if ($errors->any())<div role="alert" class="card"><p>Could not complete this action.</p><ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
-
-    <div class="stats">
-        <div class="card stat"><span class="number">{{ number_format($objects->total()) }}</span>matching objects</div>
-        <div class="card stat"><span class="number">{{ number_format($usedBytes) }} B</span>stored in bucket</div>
-        <div class="card stat"><span class="number">{{ $bucket->quota_bytes ? number_format($bucket->quota_bytes) . ' B' : 'No limit' }}</span>storage quota</div>
-    </div>
-
-    <section class="card">
-        <form class="filter" method="get">
-            <input name="prefix" value="{{ $prefix }}" placeholder="Filter by object prefix, for example uploads/2026/" aria-label="Object prefix">
-            <select name="state" aria-label="Object state"><option value="active" @selected($state === 'active')>Active</option><option value="trash" @selected($state === 'trash')>Trash</option></select>
-            <button>Filter</button>
-        </form>
-        <div class="table-wrap"><table>
-            <thead><tr><th>Object key</th><th>Type</th><th class="right">Size</th><th class="right">Modified</th><th></th></tr></thead>
-            <tbody>
-            @forelse ($objects as $object)
-                <tr>
-                    <td><code>{{ $object->key }}</code></td><td>{{ $object->content_type ?: 'application/octet-stream' }}</td><td class="right">{{ number_format($object->size) }} B</td><td class="right">{{ $object->updated_at->diffForHumans() }}</td>
-                    <td><div class="actions">@if ($state === 'active')<a href="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/download') }}">Download</a><form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id) }}">@csrf @method('DELETE')<button class="danger">Delete</button></form>@else<form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/restore') }}">@csrf<button>Restore</button></form><details><summary>Permanently delete</summary><form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/purge') }}">@csrf @method('DELETE')<label><input type="checkbox" name="confirm_purge" value="1" required> Permanently delete {{ $object->key }}. This cannot be undone.</label><button class="danger">Permanently delete</button></form></details>@endif</div></td>
-                </tr>
-            @empty
-                <tr><td colspan="5" class="muted empty">No {{ $state === 'trash' ? 'trashed' : 'active' }} objects match this prefix.</td></tr>
-            @endforelse
-            </tbody>
-        </table></div>
-        @if ($objects->hasPages())
-            <div class="pagination"><span class="muted">Showing {{ $objects->firstItem() }}–{{ $objects->lastItem() }} of {{ $objects->total() }}</span><span>@if ($objects->onFirstPage()) <span class="muted">Previous</span> @else <a href="{{ $objects->previousPageUrl() }}">Previous</a> @endif &nbsp; @if ($objects->hasMorePages()) <a href="{{ $objects->nextPageUrl() }}">Next</a> @else <span class="muted">Next</span> @endif</span></div>
-        @endif
-    </section>
-</main>
-</body>
-</html>
+    @if ($state === 'trash')
+        @foreach ($objects as $object)
+            <dialog class="dialog bucket-purge" id="purge-object-{{ $object->id }}" aria-labelledby="purge-title-{{ $object->id }}" aria-describedby="purge-description-{{ $object->id }}">
+                <div class="dialog-header">
+                    <h2 id="purge-title-{{ $object->id }}">Permanently delete object?</h2>
+                    <button class="icon-button dialog-close" type="button" data-close-dialog aria-label="Close delete dialog" autofocus><x-console-icon name="close" /></button>
+                </div>
+                <form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/purge') }}">
+                    @csrf
+                    @method('DELETE')
+                    <div class="dialog-body">
+                        <p class="mono bucket-purge-key">{{ $object->key }}</p>
+                        <p id="purge-description-{{ $object->id }}">This permanently removes the object and its stored data from {{ $bucket->name }}. You cannot restore it after deletion.</p>
+                        <label class="bucket-confirm" for="confirm-purge-{{ $object->id }}">
+                            <input id="confirm-purge-{{ $object->id }}" type="checkbox" name="confirm_purge" value="1" required>
+                            <span>I understand this object will be permanently deleted. This cannot be undone.</span>
+                        </label>
+                    </div>
+                    <div class="dialog-footer">
+                        <button class="btn btn-secondary" type="button" data-close-dialog>Cancel</button>
+                        <button class="btn btn-danger" type="submit"><x-console-icon name="trash" /> Permanently delete</button>
+                    </div>
+                </form>
+            </dialog>
+        @endforeach
+    @endif
+@endsection

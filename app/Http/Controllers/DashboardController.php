@@ -17,10 +17,12 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $filters = request()->validate(['activity_bucket' => ['nullable', 'string', 'max:255'], 'activity_action' => ['nullable', 'string', 'max:100'], 'activity_search' => ['nullable', 'string', 'max:255'], 'usage_bucket' => ['nullable', 'string', 'max:255']]);
+        $filters = request()->validate(['view' => ['nullable', 'in:overview,buckets,keys,activity'], 'activity_bucket' => ['nullable', 'string', 'max:255'], 'activity_action' => ['nullable', 'string', 'max:100'], 'activity_search' => ['nullable', 'string', 'max:255'], 'usage_bucket' => ['nullable', 'string', 'max:255']]);
+        $activeView = $filters['view'] ?? (request()->hasAny(['activity_bucket', 'activity_action', 'activity_search', 'activity_page']) ? 'activity' : (request()->has('usage_bucket') ? 'buckets' : 'overview'));
         $bucketRows = Bucket::query()
             ->withCount(['objects as active_objects_count' => fn ($query) => $query->whereNull('deleted_at')])
             ->withSum(['objects as active_bytes' => fn ($query) => $query->whereNull('deleted_at')], 'size')
+            ->withCount(['objects', 'multipartUploads'])
             ->orderBy('name')
             ->get();
 
@@ -33,6 +35,7 @@ class DashboardController extends Controller
             'keys' => AccessKey::whereNull('revoked_at')->latest()->get(),
             'events' => AuditEvent::query()->when($filters['activity_bucket'] ?? null, fn ($query, $bucket) => $query->where('bucket', $bucket))->when($filters['activity_action'] ?? null, fn ($query, $action) => $query->where('action', $action))->when($filters['activity_search'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query->where('actor', 'like', '%'.$search.'%')->orWhere('object_key', 'like', '%'.$search.'%')))->latest('id')->paginate(20, ['*'], 'activity_page')->withQueryString(),
             'activityFilters' => $filters,
+            'activeView' => $activeView,
         ]);
     }
 
