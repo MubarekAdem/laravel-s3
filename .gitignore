@@ -4,6 +4,7 @@
 .env.backup
 .env.production
 .env.cpanel
+.env.shared-hosting
 .phpactor.json
 .phpunit.result.cache
 /.codex
@@ -22,6 +23,10 @@
 /storage/*.key
 /storage/pail
 /storage/framework/object-store.lock
+/storage/framework/installation.lock
+/storage/framework/setup-bootstrap.lock
+/storage/framework/installation-pending.json*
+/storage/framework/setup-composer*
 /storage/framework/browser-smoke/
 /vendor
 _ide_helper.php

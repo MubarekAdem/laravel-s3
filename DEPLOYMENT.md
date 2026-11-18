@@ -1,5 +1,20 @@
 # Shared hosting deployment
 
+## Interactive setup
+
+For a new installation, upload/extract the complete project (including dotfiles and composer.lock) outside the public web directory, without a local .env, cached configuration, or development vendor directory. Then run:
+
+    cd /home/HOSTUSER/object-store
+    php setup.php
+
+The single CLI script checks PHP, locates Composer or downloads a checksum-verified installer into private storage, installs production dependencies from the lock file, then asks all application configuration questions. Passwords are hidden. It generates the key once, checks that the database and object directory are empty, creates .env with private permissions, runs migrations and admin seeding, verifies storage, caches configuration, and attempts scheduler registration while preserving existing cron entries.
+
+Use the correct hosting PHP binary if php points to an older version. **php setup.php --check** is read-only. Use **--composer=/absolute/path/composer.phar** for a custom Composer location. Outbound HTTPS is required for dependency downloads; network/certificate failures stop setup and can be retried.
+
+If a later application step fails, the installation retains its configuration and progress; resume with **php setup.php --resume**. Existing application keys are never regenerated. The application stays in maintenance mode after failures that occur after the maintenance step. If setup stops before writing an environment, fix the error and rerun without --resume.
+
+Before starting, enable PHP 8.4/extensions and create an empty MySQL database/user in the hosting panel (or choose SQLite). Configure the HTTPS domain to serve only the application's public/ directory. PHP/server body limits, DNS, TLS, database provisioning, and account permissions remain host-managed. If automatic cron setup is denied, add the printed entry in the hosting panel. The detailed manual procedure below is also available.
+
 ## Hosting requirements
 
 Keep the application at `/home/HOSTUSER/object-store` and point the storage subdomain document root at `/home/HOSTUSER/object-store/public`. Replace all example usernames, domains, database names, and paths below. Keep `.env`, `vendor`, backups, and object data outside **every** public document root. Preserve `public/.htaccess` and enable Apache rewriting. If the host cannot point a domain at `public/`, request that configuration from the host before installing.

@@ -26,6 +26,20 @@ Laravel-S3 implements a focused S3 subset, not the full AWS S3 service. See [Com
 
 The current public pages and console use Blade and directly served CSS. Node is not needed to serve them; it is needed for the optional Vite build and local browser smoke script.
 
+## Interactive shared hosting installation
+
+For a fresh upload, extract the project outside the public web directory and run:
+
+    php setup.php
+
+The CLI wizard installs locked production dependencies, asks for the HTTPS URL, database, private storage path, admin credentials, upload/retention limits, search indexing, and cron setup. It writes a private production environment, generates the application key once, migrates an empty database, creates the admin, verifies storage, and caches Laravel configuration. No Node installation is needed for the current Blade/CSS interface.
+
+Use **php setup.php --check** to check terminal requirements without changing application data. If Composer is missing, setup downloads its installer over HTTPS and verifies its published SHA-384 checksum before execution. To use a specific Composer executable, pass **--composer=/absolute/path/composer.phar**.
+
+Enable PHP 8.4 and its extensions in the hosting panel first. For MySQL, create an empty database and database user there, then enter their credentials when prompted. Set the domain document root to the project's **public/** directory and enable HTTPS. The installer cannot change your hosting account, domain, PHP extensions, or server upload limits.
+
+Existing environments and populated databases are protected. To continue an interrupted installer run, use **php setup.php --resume**; it preserves the existing application key and completed admin creation. Do not remove .env to rerun setup. If the host disallows crontab, the wizard prints the exact scheduler entry to add through the hosting panel. Admin passwords are hidden, sent to the seeder through a child-process environment, and never written to .env.
+
 ## Local installation
 
 These commands are for a **new local installation**. For production installation or updates, use the [Shared hosting deployment guide](DEPLOYMENT.md).
