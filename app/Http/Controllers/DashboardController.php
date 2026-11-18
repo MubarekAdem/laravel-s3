@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
 {
@@ -53,7 +54,16 @@ class DashboardController extends Controller
     public function updateBucket(Request $request, Bucket $bucket)
     {
         $data = $request->validate(['quota_mb' => ['nullable', 'integer', 'min:1', 'max:1048576']]);
-        $bucket->update(['quota_bytes' => isset($data['quota_mb']) ? $data['quota_mb'] * 1024 * 1024 : null]);
+        DB::transaction(function () use ($bucket, $data): void {
+            $lockedBucket = Bucket::query()->lockForUpdate()->findOrFail($bucket->id);
+            $quota = isset($data['quota_mb']) ? $data['quota_mb'] * 1024 * 1024 : null;
+            $used = (int) $lockedBucket->objects()->whereNull('deleted_at')->sum('size');
+            if ($quota !== null && $quota < $used) {
+                throw ValidationException::withMessages(['quota_mb' => 'Quota cannot be lower than the bytes currently stored.']);
+            }
+            $lockedBucket->update(['quota_bytes' => $quota]);
+        });
+        $this->auditOwner($request, 'bucket.quota.update', $bucket->name);
 
         return back()->with('status', 'Bucket quota updated.');
     }
@@ -92,6 +102,7 @@ class DashboardController extends Controller
 
     public function downloadObject(Bucket $bucket, ObjectRecord $object)
     {
+        abort_if($object->deleted_at !== null, 404);
         abort_unless(File::exists($object->path), 404);
 
         return response()->download($object->path, basename($object->key), [
@@ -125,13 +136,17 @@ class DashboardController extends Controller
 
     public function purgeObject(Request $request, Bucket $bucket, ObjectRecord $object)
     {
-        abort_unless($object->deleted_at !== null, 409, 'Only trashed objects can be purged.');
-        $expectedPath = config('object-store.root').DIRECTORY_SEPARATOR.$bucket->id.DIRECTORY_SEPARATOR.hash('sha256', $object->key);
-        if ($object->path === $expectedPath) {
-            File::delete($object->path);
-        }
+        $request->validate(['confirm_purge' => ['accepted']]);
         $key = $object->key;
-        $object->delete();
+        DB::transaction(function () use ($bucket, $object): void {
+            Bucket::query()->lockForUpdate()->findOrFail($bucket->id);
+            $storedObject = $bucket->objects()->findOrFail($object->id);
+            abort_unless($storedObject->deleted_at !== null, 409, 'Only trashed objects can be purged.');
+            $expectedPath = config('object-store.root').DIRECTORY_SEPARATOR.$bucket->id.DIRECTORY_SEPARATOR.hash('sha256', $storedObject->key);
+            abort_unless($storedObject->path === $expectedPath, 409, 'Object storage path does not match the expected location.');
+            abort_if(File::exists($storedObject->path) && ! File::delete($storedObject->path), 500, 'Object file could not be deleted.');
+            $storedObject->delete();
+        });
         $this->auditOwner($request, 'object.purge', $bucket->name, $key);
 
         return back()->with('status', 'Object permanently deleted.');

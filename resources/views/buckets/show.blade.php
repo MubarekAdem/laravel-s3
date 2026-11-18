@@ -24,6 +24,7 @@
     </div>
 
     @if (session('status')) <p class="notice">{{ session('status') }}</p> @endif
+    @if ($errors->any())<div role="alert" class="card"><p>Could not complete this action.</p><ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
 
     <div class="stats">
         <div class="card stat"><span class="number">{{ number_format($objects->total()) }}</span>matching objects</div>
@@ -43,10 +44,10 @@
             @forelse ($objects as $object)
                 <tr>
                     <td><code>{{ $object->key }}</code></td><td>{{ $object->content_type ?: 'application/octet-stream' }}</td><td class="right">{{ number_format($object->size) }} B</td><td class="right">{{ $object->updated_at->diffForHumans() }}</td>
-                    <td><div class="actions">@if ($state === 'active')<a href="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/download') }}">Download</a><form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id) }}">@csrf @method('DELETE')<button class="danger">Delete</button></form>@else<form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/restore') }}">@csrf<button>Restore</button></form><form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/purge') }}">@csrf @method('DELETE')<button class="danger">Purge</button></form>@endif</div></td>
+                    <td><div class="actions">@if ($state === 'active')<a href="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/download') }}">Download</a><form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id) }}">@csrf @method('DELETE')<button class="danger">Delete</button></form>@else<form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/restore') }}">@csrf<button>Restore</button></form><details><summary>Permanently delete</summary><form method="post" action="{{ url('/buckets/'.$bucket->name.'/objects/'.$object->id.'/purge') }}">@csrf @method('DELETE')<label><input type="checkbox" name="confirm_purge" value="1" required> Permanently delete {{ $object->key }}. This cannot be undone.</label><button class="danger">Permanently delete</button></form></details>@endif</div></td>
                 </tr>
             @empty
-                <tr><td colspan="5" class="muted empty">No active objects match this prefix.</td></tr>
+                <tr><td colspan="5" class="muted empty">No {{ $state === 'trash' ? 'trashed' : 'active' }} objects match this prefix.</td></tr>
             @endforelse
             </tbody>
         </table></div>

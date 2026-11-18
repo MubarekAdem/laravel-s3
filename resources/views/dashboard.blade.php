@@ -117,7 +117,20 @@
             <h2>Active credentials</h2>
             <div class="table-wrap"><table>
                 @forelse ($keys as $key)
-                    <tr><td><code>{{ $key->access_key }}</code></td><td><form method="post" action="/keys/{{ $key->id }}">@csrf @method('PATCH')<label><input type="checkbox" name="scopes[]" value="read" @checked(in_array('read', $key->scopes ?? [], true))> Read</label><label><input type="checkbox" name="scopes[]" value="write" @checked(in_array('write', $key->scopes ?? [], true))> Write</label><label><input type="checkbox" name="scopes[]" value="delete" @checked(in_array('delete', $key->scopes ?? [], true))> Delete</label>@foreach ($bucketRows as $bucket)<label><input type="checkbox" name="bucket_names[]" value="{{ $bucket->name }}" @checked(in_array($bucket->name, $key->bucket_names ?? [], true))> {{ $bucket->name }}</label>@endforeach<button>Save</button></form></td><td class="right"><form method="post" action="/keys/{{ $key->id }}">@csrf @method('DELETE') <button class="danger">Revoke</button></form></td></tr>
+                    <tr>
+                        <td><code>{{ $key->access_key }}</code></td>
+                        <td><form method="post" action="/keys/{{ $key->id }}">@csrf @method('PATCH')
+                            <fieldset><legend>Permissions</legend>
+                            @foreach (['read' => 'Read', 'write' => 'Write', 'delete' => 'Delete', 'list' => 'List buckets and objects'] as $scope => $label)
+                                <label><input type="checkbox" name="scopes[]" value="{{ $scope }}" @checked(in_array($scope, $key->scopes ?? [], true) || in_array('*', $key->scopes ?? [], true))> {{ $label }}</label>
+                            @endforeach
+                            </fieldset>
+                            <fieldset><legend>Allowed buckets (none selected means all)</legend>
+                            @foreach ($bucketRows as $bucket)<label><input type="checkbox" name="bucket_names[]" value="{{ $bucket->name }}" @checked(in_array($bucket->name, $key->bucket_names ?? [], true))> {{ $bucket->name }}</label>@endforeach
+                            </fieldset><button>Save permissions</button>
+                        </form></td>
+                        <td class="right"><form method="post" action="/keys/{{ $key->id }}">@csrf @method('DELETE') <button class="danger">Revoke</button></form></td>
+                    </tr>
                 @empty
                     <tr><td class="muted empty">Create a credential to connect an S3 client.</td></tr>
                 @endforelse

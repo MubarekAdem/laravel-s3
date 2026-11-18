@@ -12,6 +12,44 @@ class OwnerStorageManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_quota_cannot_be_reduced_below_current_usage(): void
+    {
+        $bucket = Bucket::create(['name' => 'media', 'quota_bytes' => 10485760]);
+        $bucket->objects()->create(['key' => 'large', 'path' => 'large', 'size' => 2097152, 'etag' => md5('large')]);
+
+        $this->actingAs(User::factory()->create())->patch('/buckets/media', ['quota_mb' => 1])->assertSessionHasErrors('quota_mb');
+
+        $this->assertSame(10485760, $bucket->fresh()->quota_bytes);
+    }
+
+    public function test_purge_requires_explicit_confirmation(): void
+    {
+        $bucket = Bucket::create(['name' => 'media']);
+        $object = $bucket->objects()->create(['key' => 'old', 'path' => 'old', 'size' => 1, 'etag' => md5('old'), 'deleted_at' => now()]);
+
+        $this->actingAs(User::factory()->create())->delete('/buckets/media/objects/'.$object->id.'/purge')->assertSessionHasErrors('confirm_purge');
+
+        $this->assertModelExists($object);
+    }
+
+    public function test_purge_refuses_unexpected_storage_paths_even_with_confirmation(): void
+    {
+        $bucket = Bucket::create(['name' => 'media']);
+        $object = $bucket->objects()->create(['key' => 'old', 'path' => 'unexpected-path', 'size' => 1, 'etag' => md5('old'), 'deleted_at' => now()]);
+
+        $this->actingAs(User::factory()->create())->delete('/buckets/media/objects/'.$object->id.'/purge', ['confirm_purge' => true])->assertConflict();
+
+        $this->assertModelExists($object);
+    }
+
+    public function test_trashed_objects_cannot_be_downloaded_by_owner_route(): void
+    {
+        $bucket = Bucket::create(['name' => 'media']);
+        $object = $bucket->objects()->create(['key' => 'old', 'path' => 'old', 'size' => 1, 'etag' => md5('old'), 'deleted_at' => now()]);
+
+        $this->actingAs(User::factory()->create())->get('/buckets/media/objects/'.$object->id.'/download')->assertNotFound();
+    }
+
     public function test_owner_can_update_a_quota_and_delete_an_empty_bucket(): void
     {
         $owner = User::factory()->create();
@@ -33,8 +71,9 @@ class OwnerStorageManagementTest extends TestCase
         $this->assertNull($object->fresh()->deleted_at);
         $object = $object->fresh();
         $object->update(['deleted_at' => now()]);
+        $object->update(['path' => config('object-store.root').DIRECTORY_SEPARATOR.$bucket->id.DIRECTORY_SEPARATOR.hash('sha256', $object->key)]);
         $this->assertNotNull($object->fresh()->deleted_at);
-        $this->actingAs($owner)->delete('/buckets/media/objects/'.$object->id.'/purge')->assertRedirect();
+        $this->actingAs($owner)->delete('/buckets/media/objects/'.$object->id.'/purge', ['confirm_purge' => true])->assertRedirect();
         $this->assertModelMissing($object);
     }
 
