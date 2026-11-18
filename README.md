@@ -8,9 +8,9 @@ Harbor runs without an AWS account or a separate object-storage service. It incl
 
 - **Storage API:** Signature V4 and presigned URLs, bucket operations, object uploads/downloads, metadata, copy, listing with continuation tokens, and bulk deletion.
 - **Large-file handling:** streamed transfers, byte-range downloads, conditional GET/HEAD, and multipart uploads with part-order, ETag, and minimum-size validation.
-- **Owner console:** bucket quotas, scoped access keys, object inventory, retained trash, restore/permanent deletion, usage filtering, and searchable audit activity.
+- **Owner console:** profile and password management, bucket quotas, scoped access keys, object inventory, retained trash, restore/permanent deletion, usage filtering, and searchable audit activity.
 - **Recovery and maintenance:** coordinated writes and cleanup, recoverable object publication, expiring multipart uploads, checksum-verified backups, and verified restores into an empty installation.
-- **Public pages:** a product landing page and API reference with copyable curl examples.
+- **Public pages:** a product landing page and searchable API reference with copyable curl examples, OpenAPI 3.1, and plain-text AI references.
 
 Harbor implements a focused S3 subset, not the full AWS S3 service. See [Compatibility](#compatibility) before choosing client settings.
 
@@ -64,12 +64,20 @@ Keep `APP_URL` in `.env` consistent with the address used to access the applicat
 | --- | --- | --- |
 | `/` | Product landing page | Public |
 | `/api/docs` | API reference and request examples | Public |
+| `/api/openapi.json` | OpenAPI 3.1 specification | Public |
+| `/llms.txt` | AI reference discovery index | Public |
+| `/llms-full.txt` | Full API reference as plain text | Public |
 | `/login` | Owner sign-in | Guest |
 | `/dashboard` | Storage owner console | Authenticated owner |
+| `/profile` | Owner name, email, and password settings | Authenticated owner |
 | `/s3` | Path-style storage API | Signature V4 or supported public reads |
 | `/up` | Laravel health endpoint | Public |
 
 Sign in, create a bucket, and issue an API key with the permissions your application needs. Copy the secret when it is displayed; the console does not display it again.
+
+Choose **My profile** in the console to update your account. Email changes require your current password. Password changes keep the current session signed in and revoke other database sessions; other session backends reject an old password hash on the next console request. No 12-character password minimum is enforced.
+
+AI clients can start at `/llms.txt`, then read `/llms-full.txt` or `/api/openapi.json`. The full text is generated from the human reference to keep examples and configured limits consistent. OpenAPI groups S3 query-subresource variants under their shared HTTP method and path; read each operation description when generating a client.
 
 ## Connecting an application
 

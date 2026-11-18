@@ -1,18 +1,26 @@
 <?php
 
+use App\Http\Controllers\ApiDocumentationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\S3Controller;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'landing')->name('home');
 Route::view('/api/docs', 'api.docs')->name('api.docs');
+Route::get('/api/openapi.json', [ApiDocumentationController::class, 'openapi'])->name('api.openapi');
+Route::get('/llms.txt', [ApiDocumentationController::class, 'index'])->name('ai.index');
+Route::get('/llms-full.txt', [ApiDocumentationController::class, 'full'])->name('ai.full');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'create'])->name('login');
     Route::post('/login', [AuthController::class, 'store']);
 });
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'auth.session'])->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->middleware('throttle:10,1')->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'password'])->middleware('throttle:10,1')->name('profile.password');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/buckets', [DashboardController::class, 'storeBucket']);
     Route::get('/buckets/{bucket:name}', [DashboardController::class, 'showBucket']);

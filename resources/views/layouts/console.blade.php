@@ -21,17 +21,19 @@
             @php($selected = ($activeView ?? 'buckets') === $viewName)
             <a href="{{ route('dashboard', ['view' => $viewName]) }}" class="side-link {{ $selected ? 'is-active' : '' }}" @if ($selected) aria-current="page" @endif><x-console-icon :name="$navigation[0]" /><span>{{ $navigation[1] }}</span>@if ($viewName === 'buckets' && isset($buckets))<span class="nav-count">{{ $buckets }}</span>@endif</a>
         @endforeach
+        <p class="nav-caption nav-caption-spaced">Account</p>
+        <a href="{{ route('profile.edit') }}" class="side-link {{ ($activeView ?? '') === 'profile' ? 'is-active' : '' }}" @if (($activeView ?? '') === 'profile') aria-current="page" @endif><x-console-icon name="settings" /><span>My profile</span></a>
         <p class="nav-caption nav-caption-spaced">Resources</p>
         <a href="{{ route('api.docs') }}" class="side-link"><x-console-icon name="book" /><span>API documentation</span><x-console-icon name="external" class="nav-external" /></a>
         <a href="{{ route('home') }}" class="side-link"><x-console-icon name="globe" /><span>Public site</span><x-console-icon name="external" class="nav-external" /></a>
     </nav>
     <div class="sidebar-footer"><div class="local-label"><x-console-icon name="server" />Self-hosted storage</div><p>Running on your infrastructure.</p><span class="region-label">{{ config('object-store.region') }}</span></div>
-    <div class="sidebar-account"><span class="avatar">{{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}</span><div><strong>{{ auth()->user()->name }}</strong><small>Workspace owner</small></div><form method="post" action="{{ url('/logout') }}">@csrf<button type="submit" class="sidebar-signout" title="Sign out" aria-label="Sign out"><x-console-icon name="logout" /></button></form></div>
+    <div class="sidebar-account"><span class="avatar">{{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}</span><a class="sidebar-profile-link" href="{{ route('profile.edit') }}" aria-label="Manage my profile"><strong>{{ auth()->user()->name }}</strong><small>Workspace owner</small></a><form method="post" action="{{ url('/logout') }}">@csrf<button type="submit" class="sidebar-signout" title="Sign out" aria-label="Sign out"><x-console-icon name="logout" /></button></form></div>
 </aside>
 <div class="console-frame">
     <header class="topbar">
         <div class="breadcrumbs"><button type="button" class="icon-button mobile-nav-toggle" data-nav-toggle aria-controls="console-sidebar" aria-expanded="false" aria-label="Open navigation"><x-console-icon name="menu" /></button><span class="breadcrumb-workspace">Workspace</span><x-console-icon name="chevron-right" /><span>@yield('breadcrumb', 'Overview')</span></div>
-        <div class="topbar-actions"><a href="{{ route('api.docs') }}" class="topbar-docs"><x-console-icon name="book" />Developer docs</a><span class="topbar-divider"></span><span class="avatar avatar-small" title="{{ auth()->user()->email }}">{{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}</span></div>
+        <div class="topbar-actions"><a href="{{ route('api.docs') }}" class="topbar-docs"><x-console-icon name="book" />Developer docs</a><span class="topbar-divider"></span><a href="{{ route('profile.edit') }}" class="avatar avatar-small" title="Manage my profile" aria-label="Manage my profile">{{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}</a></div>
     </header>
     <main id="workspace" class="workspace" tabindex="-1">
         @if (session('status'))<div class="alert alert-success" role="status"><x-console-icon name="check" /><span>{{ session('status') }}</span></div>@endif

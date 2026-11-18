@@ -7,6 +7,8 @@
     <meta name="description" content="Harbor Storage is a Laravel object storage server with a supported S3 API subset, built for hosting you control.">
     <title>@yield('title', 'Harbor Storage')</title>
     <link rel="stylesheet" href="{{ asset('css/harbor-public.css') }}">
+    <link rel="describedby" type="application/json" href="{{ route('api.openapi') }}">
+    <link rel="alternate" type="text/plain" title="AI reference index" href="{{ route('ai.index') }}">
     @stack('styles')
 </head>
 <body class="harbor-public">

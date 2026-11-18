@@ -86,6 +86,10 @@ try {
             await writeFile(join(screenshots, `${name}-${width}.png`), Buffer.from(screenshot.data, 'base64'));
         }
     }
+    await evaluate('document.querySelector("[data-docs-toggle]").click(); document.querySelector("#docs-search").value="multipart"; document.querySelector("#docs-search").dispatchEvent(new Event("input")); true');
+    if (!(await evaluate('document.querySelector("#docs-search-status").textContent.includes("matching sections") && document.querySelector(".docs-nav a[href=\\\"#multipart\\\"]").hidden === false'))) throw new Error('Docs search did not return multipart section');
+    await evaluate('document.querySelector("#docs-search").value=""; document.querySelector("#docs-search").dispatchEvent(new Event("input")); document.querySelector(".docs-nav a[href=\\\"#multipart\\\"]").click(); true');
+    if (!(await evaluate('document.querySelector("[data-docs-toggle]").getAttribute("aria-expanded") === "false"'))) throw new Error('Docs mobile menu did not close');
     for (const width of [1280, 390]) {
         await page('Emulation.setDeviceMetricsOverride', {width, height: 900, deviceScaleFactor: 1, mobile: false});
         await page('Page.navigate', {url: base + '/login'});
@@ -96,6 +100,16 @@ try {
     }
     await evaluate('document.querySelector("input[name=email]").value="browser@example.test"; document.querySelector("input[name=password]").value="browser-smoke-password"; document.querySelector("form").requestSubmit(); true');
     await until(() => evaluate('!!document.querySelector("[data-console-page]")'), 'authenticated dashboard');
+    await page('Page.navigate', {url: base + '/profile'});
+    await until(() => evaluate('!!document.querySelector("#profile-name")'), 'owner profile');
+    for (const width of [1280, 390]) {
+        await page('Emulation.setDeviceMetricsOverride', {width, height: 900, deviceScaleFactor: 1, mobile: false});
+        if (await evaluate('document.documentElement.scrollWidth > innerWidth')) throw new Error('Profile overflows at ' + width);
+        const screenshot = await capture({format: 'png', captureBeyondViewport: true});
+        await writeFile(join(screenshots, `profile-${width}.png`), Buffer.from(screenshot.data, 'base64'));
+    }
+    await page('Page.navigate', {url: base + '/dashboard'});
+    await until(() => evaluate('!!document.querySelector("[data-console-page]")'), 'return to dashboard');
     for (const width of [1280, 390]) {
         await page('Emulation.setDeviceMetricsOverride', {width, height: 900, deviceScaleFactor: 1, mobile: false});
         const screenshot = await capture({format: 'png', captureBeyondViewport: true});
@@ -129,7 +143,7 @@ try {
     const inventoryScreenshot = await capture({format: 'png', captureBeyondViewport: true});
     await writeFile(join(screenshots, 'inventory-390.png'), Buffer.from(inventoryScreenshot.data, 'base64'));
     if (exceptions.length) throw new Error(exceptions.join('\n'));
-    console.log('Browser smoke passed: landing, API docs, login, authenticated dashboard, bucket inventory; desktop and mobile. Screenshots: storage/framework/browser-smoke.');
+    console.log('Browser smoke passed: landing, API docs and search/navigation, login, owner profile, authenticated dashboard, bucket inventory; desktop and mobile. Screenshots: storage/framework/browser-smoke.');
 } finally {
     if (socket?.readyState === WebSocket.OPEN) { try { await call('Browser.close'); } catch {} socket.close(); }
     browser?.kill();

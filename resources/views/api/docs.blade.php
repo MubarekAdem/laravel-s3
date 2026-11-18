@@ -1,39 +1,10 @@
-@extends('layouts.public')
+@extends('layouts.docs')
 @section('title', 'API documentation · Harbor Storage')
-
-@push('styles')
-<style>
-    .docs-surface { background: #f5f3ec; } .docs-surface :focus-visible { outline-color: #2457e8; }
-    .docs-shell { max-width: 1400px; margin: auto; padding: 56px 32px 100px; display: grid; grid-template-columns: 215px minmax(0, 1fr); gap: 64px; }
-    .docs-nav { position: sticky; top: 100px; align-self: start; display: grid; gap: 5px; font-size: 14px; color: #203746; }
-    .docs-nav p { margin: 0 0 12px; font-weight: 700; } .docs-nav a { padding: 8px 12px; border-left: 2px solid #d7dfe5; color: #456071; text-decoration: none; }
-    .docs-nav a:hover, .docs-nav a[aria-current] { border-color: #2457e8; color: #2457e8; background: #edf2ff; }
-    .docs-main { min-width: 0; color: #203746; } .docs-main h1 { font-size: clamp(38px, 5vw, 66px); line-height: 1.08; letter-spacing: -.05em; margin: 10px 0 22px; color: #091827; }
-    .docs-main h2 { font-size: 30px; letter-spacing: -.03em; margin: 0 0 16px; color: #091827; } .docs-main h3 { font-size: 19px; margin: 26px 0 10px; }
-    .docs-main p, .docs-main li { line-height: 1.75; max-width: 77ch; } .docs-main p { margin: 14px 0; } .docs-main a { color: #2457e8; } .docs-main section { padding: 42px 0; border-bottom: 1px solid #d7dfe5; scroll-margin-top: 100px; }
-    .docs-main section:first-child { padding-top: 0; } .docs-intro { font-size: 19px; color: #526a79; } .docs-version { font-size: 13px; font-weight: 600; color: #2457e8; }
-    .docs-notice { padding: 18px 22px; background: #edf2ff; border-left: 3px solid #2457e8; border-radius: 0 8px 8px 0; margin: 22px 0; }
-    .docs-code { position: relative; margin: 20px 0; min-width: 0; } .docs-code pre { background: #091827; color: #d7e6f1; padding: 48px 24px 24px; border-radius: 10px; overflow-x: auto; font-size: 13px; line-height: 1.8; margin: 0; tab-size: 2; }
-    .docs-code button { position: absolute; right: 12px; top: 10px; border: 1px solid #35516a; border-radius: 5px; background: #163047; color: #e5f1f9; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
-    .docs-main :not(pre) > code { background: #eaf0f5; padding: 2px 5px; border-radius: 4px; font-size: .9em; overflow-wrap: anywhere; }
-    .docs-table { overflow-x: auto; margin: 22px 0; } .docs-table table { border-collapse: collapse; width: 100%; text-align: left; font-size: 14px; } .docs-table th { color: #526a79; font-size: 12px; font-weight: 600; } .docs-table td, .docs-table th { border-bottom: 1px solid #d7dfe5; padding: 14px 12px 14px 0; vertical-align: top; } .docs-table td:first-child { white-space: nowrap; }
-    .docs-method { font-family: ui-monospace, monospace; font-size: 11px; color: #2457e8; background: #edf2ff; padding: 4px 6px; border-radius: 4px; font-weight: 700; display: inline-block; min-width: 44px; text-align: center; }
-    .docs-steps { padding-left: 22px; } .docs-steps li { margin: 12px 0; } .docs-main details { padding: 16px 0; border-bottom: 1px solid #d7dfe5; } .docs-main summary { cursor: pointer; font-weight: 600; }
-    @media (max-width: 900px) { .docs-shell { grid-template-columns: minmax(0, 1fr); padding: 28px 20px 64px; gap: 36px; } .docs-nav { position: static; display: flex; flex-wrap: wrap; gap: 0; border-bottom: 1px solid #d7dfe5; padding-bottom: 16px; } .docs-nav p { flex-basis: 100%; } .docs-nav a { padding: 6px 10px; font-size: 13px; border: 0; } .docs-main section { padding: 32px 0; } }
-    @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
-</style>
-@endpush
-
 @section('content')
-<div class="docs-surface"><div class="docs-shell">
-    <aside class="docs-nav" aria-label="Documentation sections">
-        <p>Developer reference</p>
-        <a href="#overview">Overview</a><a href="#quickstart">Quickstart</a><a href="#authentication">Authentication</a><a href="#buckets">Buckets</a><a href="#objects">Objects</a><a href="#multipart">Multipart uploads</a><a href="#presigned">Presigned URLs</a><a href="#errors">Errors &amp; retries</a><a href="#limits">Limits &amp; compatibility</a>
-    </aside>
     <article class="docs-main">
         <section id="overview">
-            <span class="docs-version">Harbor Storage / S3 API</span>
-            <h1>Build against your own storage.</h1>
+            <span class="docs-version">Storage API reference</span>
+            <h1>API documentation</h1>
             <p class="docs-intro">Use signed HTTP requests to store files on this server. The API uses S3-style paths, Signature V4 authentication, raw upload bodies, and XML control responses.</p>
             <div class="docs-notice"><strong>API base URL</strong><br><code>{{ rtrim(config('app.url'), '/') }}/s3</code><br>Region: <code>{{ config('object-store.region') }}</code>. Use path-style addressing: <code>/s3/{bucket}/{key}</code>.</div>
             <p>This is the reference for Harbor's implemented S3 subset. It is not a JSON REST API and does not require an AWS account. Browser session cookies and bearer tokens do not authenticate storage requests.</p>
@@ -204,6 +175,17 @@ s3 --request POST --header 'Content-Type: application/xml' \
             <p>Fix 4xx errors before retrying. For uncertain upload results, use HEAD to inspect the object before retrying. After a successful multipart completion the UploadId no longer exists, so blindly retrying the same completion can return NoSuchUpload.</p>
         </section>
 
+        <section id="ai-reference">
+            <h2>AI &amp; machine-readable reference</h2>
+            <p>Give an AI coding assistant the reference URLs below to build against this server's supported API. The full text is generated from this page, including its configured limits.</p>
+            <div class="docs-resource-grid">
+                <a href="{{ route('ai.index') }}"><x-console-icon name="file" /><strong>llms.txt</strong><span>Discovery index and reference links</span></a>
+                <a href="{{ route('ai.full') }}"><x-console-icon name="book" /><strong>llms-full.txt</strong><span>Complete reference as plain text</span></a>
+                <a href="{{ route('api.openapi') }}"><x-console-icon name="download" /><strong>OpenAPI 3.1</strong><span>HTTP paths, parameters, and schemas</span></a>
+            </div>
+            <p>The OpenAPI file describes shared S3 subresource operations in each method's description. Signing requires a Signature V4-capable client; entering an access key as a bearer token will not work.</p>
+        </section>
+
         <section id="limits">
             <h2>Limits &amp; compatibility</h2>
             <div class="docs-table"><table><thead><tr><th>Setting</th><th>This server</th></tr></thead><tbody>
@@ -219,26 +201,4 @@ s3 --request POST --header 'Content-Type: application/xml' \
             <p>The owner console uses separate authenticated browser routes and CSRF-protected forms. This page documents the storage API, not a public administrative API. Actual capacity and throughput depend on the host's disk, database, PHP limits, and configuration.</p>
         </section>
     </article>
-</div></div>
 @endsection
-
-@push('scripts')
-<script>
-    document.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
-        const text = button.parentElement.querySelector('code').textContent;
-        try { await navigator.clipboard.writeText(text); button.textContent = 'Copied'; }
-        catch { button.textContent = 'Select code to copy'; }
-        setTimeout(() => { button.textContent = 'Copy'; }, 2000);
-    }));
-    if ('IntersectionObserver' in window) {
-        const observer = new IntersectionObserver(entries => entries.forEach(entry => {
-            if (!entry.isIntersecting) return;
-            document.querySelectorAll('.docs-nav a').forEach(link => {
-                if (link.hash === '#' + entry.target.id) link.setAttribute('aria-current', 'location');
-                else link.removeAttribute('aria-current');
-            });
-        }), {rootMargin: '-15% 0px -65% 0px'});
-        document.querySelectorAll('.docs-main section').forEach(section => observer.observe(section));
-    }
-</script>
-@endpush
