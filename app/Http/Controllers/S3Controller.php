@@ -245,11 +245,14 @@ class S3Controller extends Controller
         $upload = $this->multipartUpload($bucket, $key, $request->string('uploadId')->toString());
         $partNumber = $request->integer('partNumber');
         abort_unless($partNumber >= 1 && $partNumber <= 10000, 400, 'Invalid part number.');
-        $body = $request->getContent();
         $path = config('object-store.root').DIRECTORY_SEPARATOR.'multipart'.DIRECTORY_SEPARATOR.$upload->upload_id.DIRECTORY_SEPARATOR.$partNumber;
-        File::ensureDirectoryExists(dirname($path));
-        File::put($path, $body);
-        $part = $upload->parts()->updateOrCreate(['part_number' => $partNumber], ['path' => $path, 'size' => strlen($body), 'etag' => md5($body)]);
+        $temporaryPart = $this->streamRequestToTemporaryPath($request, $path);
+        try {
+            File::copy($temporaryPart['path'], $path);
+        } finally {
+            File::delete($temporaryPart['path']);
+        }
+        $part = $upload->parts()->updateOrCreate(['part_number' => $partNumber], ['path' => $path, 'size' => $temporaryPart['size'], 'etag' => $temporaryPart['etag']]);
         $this->audit($request, 'multipart.part.put', $bucket, $key);
 
         return response('', 200, ['ETag' => '"'.$part->etag.'"']);
@@ -264,19 +267,23 @@ class S3Controller extends Controller
         $storedParts = $parts->map(fn (MultipartPart $part) => ['number' => (int) $part->part_number, 'etag' => $part->etag])->all();
         abort_if($requestedParts !== $storedParts, 400, 'Multipart completion parts do not match uploaded parts.');
         $size = $parts->sum('size');
-        $bucketModel = $this->bucket($bucket);
-        $this->ensureWithinQuota($bucketModel, $key, $size);
-        $path = $this->path($bucketModel, $key);
-        File::ensureDirectoryExists(dirname($path));
-        $destination = fopen($path, 'wb');
-        foreach ($parts as $part) {
-            $source = fopen($part->path, 'rb');
-            stream_copy_to_stream($source, $destination);
-            fclose($source);
-        }
-        fclose($destination);
-        $etag = md5_file($path);
-        $bucketModel->objects()->updateOrCreate(['key' => $key], ['path' => $path, 'size' => $size, 'etag' => $etag, 'content_type' => $upload->content_type, 'metadata' => $upload->metadata, 'is_public' => $upload->is_public, 'deleted_at' => null]);
+        $etag = DB::transaction(function () use ($bucket, $key, $size, $parts, $upload) {
+            $bucketModel = Bucket::query()->lockForUpdate()->where('name', $bucket)->firstOrFail();
+            $this->ensureWithinQuota($bucketModel, $key, $size);
+            $path = $this->path($bucketModel, $key);
+            File::ensureDirectoryExists(dirname($path));
+            $destination = fopen($path, 'wb');
+            foreach ($parts as $part) {
+                $source = fopen($part->path, 'rb');
+                stream_copy_to_stream($source, $destination);
+                fclose($source);
+            }
+            fclose($destination);
+            $etag = md5_file($path);
+            $bucketModel->objects()->updateOrCreate(['key' => $key], ['path' => $path, 'size' => $size, 'etag' => $etag, 'content_type' => $upload->content_type, 'metadata' => $upload->metadata, 'is_public' => $upload->is_public, 'deleted_at' => null]);
+
+            return $etag;
+        });
         $this->removeMultipartFiles($upload);
         $upload->delete();
         $this->audit($request, 'multipart.complete', $bucket, $key);
