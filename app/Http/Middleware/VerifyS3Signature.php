@@ -7,6 +7,7 @@ use App\Models\Bucket;
 use App\Models\ObjectRecord;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 
 class VerifyS3Signature
@@ -17,9 +18,23 @@ class VerifyS3Signature
             return $next($r);
         }
 
-        $h = $r->header('Authorization', '');
-        if (! preg_match('/Credential=([^\/]+)\/([^,]+),\s*SignedHeaders=([^,]+),\s*Signature=([a-f0-9]{64})/i', $h, $m)) {
-            return response('Missing or malformed AWS Signature V4 authorization.', 403);
+        $isPresigned = $r->query('X-Amz-Algorithm') === 'AWS4-HMAC-SHA256';
+        if ($isPresigned) {
+            [$accessKey, $scope] = explode('/', (string) $r->query('X-Amz-Credential'), 2) + ['', ''];
+            $m = [1 => $accessKey, 2 => $scope, 3 => (string) $r->query('X-Amz-SignedHeaders'), 4 => (string) $r->query('X-Amz-Signature')];
+            $date = (string) $r->query('X-Amz-Date');
+            $expires = (int) $r->query('X-Amz-Expires', 0);
+
+            if ($date === '' || $expires < 1 || $expires > 604800 || Carbon::createFromFormat('Ymd\\THis\\Z', $date, 'UTC')->addSeconds($expires)->isPast()) {
+                return response('Presigned URL has expired.', 403);
+            }
+        } else {
+            $h = $r->header('Authorization', '');
+            if (! preg_match('/Credential=([^\/]+)\/([^,]+),\s*SignedHeaders=([^,]+),\s*Signature=([a-f0-9]{64})/i', $h, $m)) {
+                return response('Missing or malformed AWS Signature V4 authorization.', 403);
+            }
+
+            $date = $r->header('x-amz-date');
         }
 
         $key = AccessKey::where('access_key', $m[1])->whereNull('revoked_at')->first();
@@ -36,7 +51,6 @@ class VerifyS3Signature
             return response('Invalid credential scope.', 403);
         }
 
-        $date = $r->header('x-amz-date');
         if (! $date) {
             return response('Missing x-amz-date.', 403);
         }
@@ -47,8 +61,9 @@ class VerifyS3Signature
         }
 
         $q = $r->query();
+        unset($q['X-Amz-Signature']);
         ksort($q);
-        $payload = $r->header('x-amz-content-sha256', hash('sha256', $r->getContent()));
+        $payload = $r->header('x-amz-content-sha256', $isPresigned ? 'UNSIGNED-PAYLOAD' : hash('sha256', $r->getContent()));
         $canonical = $r->method()."\n/".ltrim($r->path(), '/')."\n".http_build_query($q, '', '&', PHP_QUERY_RFC3986)."\n".$headers."\n".$m[3]."\n".$payload;
         $string = "AWS4-HMAC-SHA256\n{$date}\n{$m[2]}\n".hash('sha256', $canonical);
         try {
