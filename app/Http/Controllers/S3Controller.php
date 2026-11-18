@@ -151,7 +151,50 @@ class S3Controller extends Controller
 
     public function post(Request $request, string $bucket, string $key)
     {
-        return $request->has('uploads') ? $this->initiateMultipart($request, $bucket, $key) : $this->completeMultipart($request, $bucket, $key);
+        if ($request->has('uploads')) {
+            return $this->initiateMultipart($request, $bucket, $key);
+        }
+
+        return $this->completeMultipart($request, $bucket, $key);
+    }
+
+    public function deleteObjects(Request $request, string $bucket)
+    {
+        $xml = $this->deleteRequestXml($request->getContent());
+        $keys = [];
+        foreach ($xml->children() as $object) {
+            if ($object->getName() === 'Object' && (string) $object->Key !== '') {
+                $keys[] = (string) $object->Key;
+            }
+        }
+
+        abort_if($keys === [] || count($keys) > 1000, 400, 'Delete request must contain between 1 and 1000 object keys.');
+
+        $bucketModel = $this->bucket($bucket);
+        $objects = $bucketModel->objects()
+            ->whereIn('key', array_unique($keys))
+            ->whereNull('deleted_at')
+            ->get();
+        $objects->each->update(['deleted_at' => now()]);
+        foreach ($objects as $object) {
+            $this->audit($request, 'object.delete', $bucket, $object->key);
+        }
+
+        return response()->view('s3.delete', [
+            'keys' => $keys,
+            'quiet' => strtolower((string) $xml->Quiet) === 'true',
+        ], 200, ['Content-Type' => 'application/xml']);
+    }
+
+    private function deleteRequestXml(string $body): \SimpleXMLElement
+    {
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($body, \SimpleXMLElement::class, LIBXML_NONET | LIBXML_NOCDATA);
+        libxml_clear_errors();
+
+        abort_if($xml === false || $xml->getName() !== 'Delete', 400, 'Malformed DeleteObjects request.');
+
+        return $xml;
     }
 
     private function initiateMultipart(Request $request, string $bucket, string $key)

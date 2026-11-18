@@ -22,6 +22,7 @@ Route::middleware('auth')->group(function () {
 Route::prefix('s3')->middleware('s3.signature')->group(function () {
     Route::get('/', [S3Controller::class, 'buckets']);
     Route::put('/{bucket}', [S3Controller::class, 'createBucket']);
+    Route::post('/{bucket}', [S3Controller::class, 'deleteObjects']);
     Route::delete('/{bucket}', [S3Controller::class, 'deleteBucket']);
     Route::get('/{bucket}', [S3Controller::class, 'list']);
     Route::put('/{bucket}/{key}', [S3Controller::class, 'put'])->where('key', '.*');

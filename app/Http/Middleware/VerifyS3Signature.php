@@ -62,6 +62,9 @@ class VerifyS3Signature
 
         $q = $r->query();
         unset($q['X-Amz-Signature']);
+        foreach ($q as $name => $value) {
+            $q[$name] = $value ?? '';
+        }
         ksort($q);
         $payload = $r->header('x-amz-content-sha256', $isPresigned ? 'UNSIGNED-PAYLOAD' : hash('sha256', $r->getContent()));
         $canonical = $r->method()."\n/".ltrim($r->path(), '/')."\n".http_build_query($q, '', '&', PHP_QUERY_RFC3986)."\n".$headers."\n".$m[3]."\n".$payload;
@@ -106,7 +109,7 @@ class VerifyS3Signature
 
     private function actionFor(Request $request): string
     {
-        if ($request->isMethod('DELETE')) {
+        if ($request->isMethod('DELETE') || ($request->isMethod('POST') && $request->has('delete'))) {
             return 'delete';
         }
 
