@@ -14,10 +14,15 @@ class BucketQuotaTest extends TestCase
     {
         Bucket::create(['name' => 'limited', 'quota_bytes' => 3]);
 
-        $response = $this->withoutMiddleware()->put('/s3/limited/report.txt', 'four', [
-            'Content-Type' => 'text/plain',
-            'Content-Length' => '4',
-        ]);
+        $response = $this->withoutMiddleware()->call(
+            'PUT',
+            '/s3/limited/report.txt',
+            [],
+            [],
+            [],
+            ['CONTENT_TYPE' => 'text/plain', 'CONTENT_LENGTH' => '4'],
+            'four',
+        );
 
         $response->assertStatus(413);
         $this->assertDatabaseCount('objects', 0);
