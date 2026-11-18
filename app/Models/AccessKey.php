@@ -6,7 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class AccessKey extends Model
 {
-    protected $fillable = ['access_key', 'secret_encrypted', 'scopes', 'revoked_at'];
+    protected $fillable = ['access_key', 'secret_encrypted', 'scopes', 'bucket_names', 'revoked_at'];
 
-    protected $casts = ['scopes' => 'array', 'revoked_at' => 'datetime', 'last_used_at' => 'datetime'];
+    protected $hidden = ['secret_encrypted'];
+
+    protected $casts = ['scopes' => 'array', 'bucket_names' => 'array', 'revoked_at' => 'datetime', 'last_used_at' => 'datetime'];
 }

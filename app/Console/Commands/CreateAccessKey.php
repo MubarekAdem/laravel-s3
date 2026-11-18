@@ -9,15 +9,15 @@ use Illuminate\Support\Str;
 
 class CreateAccessKey extends Command
 {
-    protected $signature = 'object-store:key {--scope=* : read, write, delete, or *}';
+    protected $signature = 'object-store:key {--scope=* : read, write, delete, or *} {--bucket=* : Bucket name; repeat to scope the key}';
 
     protected $description = 'Create a scoped S3 access key and display its secret once';
 
     public function handle(): int
     {
         $secret = Str::random(40);
-        $key = AccessKey::create(['access_key' => 'HBR'.strtoupper(Str::random(17)), 'secret_encrypted' => Crypt::encryptString($secret), 'scopes' => $this->option('scope') ?: ['*']]);
-        $this->table(['Access key', 'Secret', 'Scopes'], [[$key->access_key, $secret, implode(', ', $key->scopes)]]);
+        $key = AccessKey::create(['access_key' => 'HBR'.strtoupper(Str::random(17)), 'secret_encrypted' => Crypt::encryptString($secret), 'scopes' => $this->option('scope') ?: ['*'], 'bucket_names' => $this->option('bucket')]);
+        $this->table(['Access key', 'Secret', 'Scopes', 'Buckets'], [[$key->access_key, $secret, implode(', ', $key->scopes), implode(', ', $key->bucket_names ?: ['all'])]]);
         $this->warn('Save the secret now; it cannot be displayed again.');
 
         return self::SUCCESS;

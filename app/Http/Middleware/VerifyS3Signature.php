@@ -79,7 +79,14 @@ class VerifyS3Signature
             return true;
         }
 
-        return in_array($this->actionFor($request), $scopes, true);
+        if (! in_array($this->actionFor($request), $scopes, true)) {
+            return false;
+        }
+
+        $bucketNames = $key->bucket_names ?? [];
+        $bucketName = $request->segment(2);
+
+        return $bucketName === null || $bucketNames === [] || in_array($bucketName, $bucketNames, true);
     }
 
     private function actionFor(Request $request): string

@@ -19,9 +19,9 @@ class DashboardController extends Controller
 
     public function key(Request $r)
     {
-        $data = $r->validate(['scopes' => ['array']]);
+        $data = $r->validate(['scopes' => ['array'], 'bucket_names' => ['array'], 'bucket_names.*' => ['string', 'exists:buckets,name']]);
         $secret = Str::random(40);
-        $key = AccessKey::create(['access_key' => 'HBR'.strtoupper(Str::random(17)), 'secret_encrypted' => Crypt::encryptString($secret), 'scopes' => $data['scopes'] ?? ['*']]);
+        $key = AccessKey::create(['access_key' => 'HBR'.strtoupper(Str::random(17)), 'secret_encrypted' => Crypt::encryptString($secret), 'scopes' => $data['scopes'] ?? ['*'], 'bucket_names' => $data['bucket_names'] ?? []]);
 
         return back()->with('created_secret', [$key->access_key, $secret]);
     }
