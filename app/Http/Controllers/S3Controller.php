@@ -30,7 +30,7 @@ class S3Controller extends Controller
 
     private function audit(Request $r, string $action, ?string $bucket = null, ?string $key = null): void
     {
-        AuditEvent::create(['request_id' => $r->header('x-amz-request-id'), 'actor' => optional($r->attributes->get('s3_key'))->access_key, 'action' => $action, 'bucket' => $bucket, 'object_key' => $key, 'ip' => $r->ip(), 'context' => ['method' => $r->method()]]);
+        AuditEvent::create(['request_id' => $r->attributes->get('s3_request_id'), 'actor' => optional($r->attributes->get('s3_key'))->access_key, 'action' => $action, 'bucket' => $bucket, 'object_key' => $key, 'ip' => $r->ip(), 'context' => ['method' => $r->method()]]);
     }
 
     public function buckets()
@@ -217,9 +217,11 @@ class S3Controller extends Controller
             return $this->abortMultipart($r, $bucket, $key);
         }
 
-        $o = $this->bucket($bucket)->objects()->where('key', $key)->whereNull('deleted_at')->firstOrFail();
-        $o->update(['deleted_at' => now()]);
-        $this->audit($r, 'object.delete', $bucket, $key);
+        $o = $this->bucket($bucket)->objects()->where('key', $key)->whereNull('deleted_at')->first();
+        if ($o !== null) {
+            $o->update(['deleted_at' => now()]);
+            $this->audit($r, 'object.delete', $bucket, $key);
+        }
 
         return response('', 204);
     }
@@ -278,7 +280,7 @@ class S3Controller extends Controller
         $upload = $bucketModel->multipartUploads()->create(['key' => $key, 'upload_id' => (string) Str::uuid(), 'content_type' => $request->header('Content-Type'), 'metadata' => [], 'is_public' => $request->header('x-amz-acl') === 'public-read']);
         $this->audit($request, 'multipart.initiate', $bucket, $key);
 
-        return response("<?xml version=\"1.0\" encoding=\"UTF-8\"?><InitiateMultipartUploadResult><Bucket>{$bucket}</Bucket><Key>{$key}</Key><UploadId>{$upload->upload_id}</UploadId></InitiateMultipartUploadResult>", 200, ['Content-Type' => 'application/xml']);
+        return response()->view('s3.multipart', ['operation' => 'initiate', 'bucketName' => $bucket, 'objectKey' => $key, 'uploadId' => $upload->upload_id], 200, ['Content-Type' => 'application/xml']);
     }
 
     private function uploadPart(Request $request, string $bucket, string $key)
@@ -352,7 +354,7 @@ class S3Controller extends Controller
         $upload->delete();
         $this->audit($request, 'multipart.complete', $bucket, $key);
 
-        return response("<?xml version=\"1.0\" encoding=\"UTF-8\"?><CompleteMultipartUploadResult><Bucket>{$bucket}</Bucket><Key>{$key}</Key><ETag>\"{$etag}\"</ETag></CompleteMultipartUploadResult>", 200, ['Content-Type' => 'application/xml']);
+        return response()->view('s3.multipart', ['operation' => 'complete', 'bucketName' => $bucket, 'objectKey' => $key, 'etag' => $etag], 200, ['Content-Type' => 'application/xml']);
     }
 
     private function abortMultipart(Request $request, string $bucket, string $key)
@@ -383,7 +385,9 @@ class S3Controller extends Controller
             return null;
         }
 
-        [$bucket, $key] = explode('/', ltrim(urldecode($copySource), '/'), 2);
+        $sourceParts = explode('/', ltrim(rawurldecode($copySource), '/'), 2);
+        abort_if(count($sourceParts) !== 2 || $sourceParts[0] === '' || $sourceParts[1] === '', 400, 'Invalid copy source.');
+        [$bucket, $key] = $sourceParts;
         $credential = $request->attributes->get('s3_key');
         if ($credential !== null) {
             $scopes = $credential->scopes ?? [];
