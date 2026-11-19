@@ -28,6 +28,17 @@ The current public pages and console use Blade and directly served CSS. Node is 
 
 ## Interactive shared hosting installation
 
+You can install directly from the latest public GitHub source without uploading a ZIP or publishing a release. From your hosting account's home directory, download and run the standalone installer:
+
+```sh
+curl --fail --show-error --location --proto '=https' --tlsv1.2 \
+  https://raw.githubusercontent.com/MubarekAdem/laravel-s3/master/install.php \
+  --output laravel-s3-install.php
+php laravel-s3-install.php --directory="$HOME/laravel-s3"
+```
+
+The destination must be new and outside the public web directory. The installer requires Git, clones the latest **master** branch, shows the downloaded commit, then runs the configuration wizard and installs locked production dependencies on the host. No GitHub account/token, release, ZIP extractor, or Node build is needed for the current interface. Use **--branch=your-branch** to select another source branch, or **--check** to check requirements without downloading code. Existing installations are never overwritten; use the documented update procedure for those.
+
 For a fresh upload, extract the project outside the public web directory and run:
 
     php setup.php

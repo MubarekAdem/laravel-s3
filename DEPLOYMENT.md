@@ -2,6 +2,19 @@
 
 ## Interactive setup
 
+To fetch the current source directly, open the hosting terminal in your account's home directory and run:
+
+```sh
+curl --fail --show-error --location --proto '=https' --tlsv1.2 \
+  https://raw.githubusercontent.com/MubarekAdem/laravel-s3/master/install.php \
+  --output laravel-s3-install.php
+php laravel-s3-install.php --directory="$HOME/laravel-s3"
+```
+
+This standalone downloader needs PHP 8.4+, Git, process execution, required PHP extensions, and outbound HTTPS. It performs a shallow clone of the latest master branch into a new private directory, prints the commit, and launches setup there. It does not depend on GitHub releases or ZIP extraction. Optional **--branch=branch-name** selects a different source branch; **--composer=/absolute/path/composer.phar** forwards a custom Composer executable. **--check** only checks requirements. Keep the destination outside every web document root and point your domain to its public/ directory afterward.
+
+Existing directories are refused. Failed application setup leaves its code and configuration intact: enter the downloaded directory and run **php setup.php --resume** for a marked interrupted installation, or **php setup.php** if no environment was created. A failed clone retains nonempty partial files for inspection. This downloader handles fresh installations; follow the update procedure below to preserve an existing deployment's data and key.
+
 For a new installation, upload/extract the complete project (including dotfiles and composer.lock) outside the public web directory, without a local .env, cached configuration, or development vendor directory. Then run:
 
     cd /home/HOSTUSER/object-store
