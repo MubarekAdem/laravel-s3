@@ -18,7 +18,7 @@ Laravel-S3 implements a focused S3 subset, not the full AWS S3 service. See [Com
 
 ## Requirements
 
-- PHP **8.4** is the verified runtime; use the committed Composer lock file to check the requirements for your installation.
+- PHP **8.4** is the required and verified runtime (`^8.4` declared in Composer); use the committed Composer lock file to check the requirements for your installation.
 - Composer and the PHP extensions required by Laravel, including PDO, Mbstring, Fileinfo, DOM/XML, OpenSSL, and cURL.
 - SQLite for local development, or MySQL/MariaDB with PDO MySQL for a typical Shared hosting deployment.
 - Writable private object storage, `storage/`, and `bootstrap/cache/`.
